@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { io, type Socket } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Cart, NftDetail, NftListResponse, NftSummary, NftUpdatedEvent, Order, OrderUpdatedEvent } from '@/lib/api-types'
@@ -61,51 +61,67 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 3_000,
-      randomizationFactor: 0,
-    })
-    socketRef.current = socket
-    let hasConnected = false
+    let disposed = false
+    let socket: Socket | null = null
+    let removeOnline = () => {}
 
-    socket.on('connect', () => {
-      setStatus('connected')
-      if (hasConnected) {
-        reconcileAfterReconnect(qc)
-        setReconnects((n) => n + 1)
-      }
-      hasConnected = true
-    })
-    socket.on('disconnect', () => setStatus('reconnecting'))
-    socket.io.on('reconnect_attempt', () => setStatus('reconnecting'))
-    socket.io.on('reconnect_failed', () => setStatus('offline'))
+    // Import sob demanda: o engine.io captura `globalThis.WebSocket` ao ser
+    // avaliado, então precisa carregar DEPOIS que o MSW instalou o interceptador.
+    void import('socket.io-client').then(({ io }) => {
+      if (disposed) return
+      const s = io(SOCKET_URL, {
+        transports: ['websocket'],
+        reconnectionDelay: 500,
+        reconnectionDelayMax: 3_000,
+        randomizationFactor: 0,
+        // falha rápido em handshakes travados para seguir tentando
+        timeout: 2_500,
+      })
+      socket = s
+      socketRef.current = s
+      ;(window as unknown as { __kurioSocket?: Socket }).__kurioSocket = s
+      let hasConnected = false
 
-    socket.on('nft.updated', (e: NftUpdatedEvent) => {
-      applyNftUpdated(qc, e)
-      setLastNftEvent(e)
-      const cart = qc.getQueryData<Cart>(qk.cart)
-      const inCart = cart?.lines.find((l) => l.nftId === e.id)
-      const detail = qc.getQueryData<NftDetail>(qk.nfts.detail(e.id))
-      if (inCart && e.price) {
-        toast.warning(`Preço atualizado: ${inCart.name}`, {
-          description: `Novo preço base ${formatEth(e.price)}. Revise o carrinho antes de finalizar.`,
-          id: `price-${e.id}`,
-        })
-      } else if (detail && e.price) {
-        toast.info(`${detail.name} agora custa ${formatEth(e.price)}`, { id: `price-${e.id}` })
-      }
-    })
-    socket.on('order.updated', (e: OrderUpdatedEvent) => applyOrderUpdated(qc, e))
+      s.on('connect', () => {
+        setStatus('connected')
+        if (hasConnected) {
+          reconcileAfterReconnect(qc)
+          setReconnects((n) => n + 1)
+        }
+        hasConnected = true
+      })
+      s.on('disconnect', () => setStatus('reconnecting'))
+      s.io.on('reconnect_attempt', () => setStatus('reconnecting'))
+      s.io.on('reconnect_failed', () => setStatus('offline'))
 
-    const onOnline = () => socket.connected || socket.connect()
-    window.addEventListener('online', onOnline)
+      s.on('nft.updated', (e: NftUpdatedEvent) => {
+        applyNftUpdated(qc, e)
+        setLastNftEvent(e)
+        const cart = qc.getQueryData<Cart>(qk.cart)
+        const inCart = cart?.lines.find((l) => l.nftId === e.id)
+        const detail = qc.getQueryData<NftDetail>(qk.nfts.detail(e.id))
+        if (inCart && e.price) {
+          toast.warning(`Preço atualizado: ${inCart.name}`, {
+            description: `Novo preço base ${formatEth(e.price)}. Revise o carrinho antes de finalizar.`,
+            id: `price-${e.id}`,
+          })
+        } else if (detail && e.price) {
+          toast.info(`${detail.name} agora custa ${formatEth(e.price)}`, { id: `price-${e.id}` })
+        }
+      })
+      s.on('order.updated', (e: OrderUpdatedEvent) => applyOrderUpdated(qc, e))
+
+      const onOnline = () => s.connected || s.connect()
+      window.addEventListener('online', onOnline)
+      removeOnline = () => window.removeEventListener('online', onOnline)
+    })
+
     return () => {
-      window.removeEventListener('online', onOnline)
-      socket.removeAllListeners()
-      socket.io.removeAllListeners()
-      socket.disconnect()
+      disposed = true
+      removeOnline()
+      socket?.removeAllListeners()
+      socket?.io.removeAllListeners()
+      socket?.disconnect()
     }
   }, [qc])
 

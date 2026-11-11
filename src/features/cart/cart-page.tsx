@@ -32,6 +32,8 @@ export function CartPage() {
       </div>
       <h1 className="mb-4 hidden font-mono text-base font-bold md:block">Carrinho</h1>
 
+      {/* altura mínima reservada: skeleton, vazio e conteúdo ocupam o mesmo espaço (CLS ≈ 0) */}
+      <div className="min-h-96">
       {query.isPending ? (
         <CartSkeleton />
       ) : query.isError ? (
@@ -43,6 +45,7 @@ export function CartPage() {
       ) : (
         <CartContent cart={query.data} />
       )}
+      </div>
 
       <NftCarousel nftId="emerald-ape-042" title="Colecionadores também viram" />
     </div>
@@ -203,7 +206,7 @@ function CartCard({ line }: { line: CartLine }) {
 
 function EmptyCart() {
   return (
-    <div className="rounded-3xl bg-surface p-10 text-center font-mono">
+    <div className="flex min-h-96 flex-col items-center justify-center rounded-3xl bg-surface p-10 text-center font-mono">
       <p className="text-sm font-bold">Seu carrinho está vazio</p>
       <p className="mt-2 text-xs text-muted">Explore o mercado e encontre sua próxima peça.</p>
       <Button asChild className="mt-6">
@@ -215,13 +218,8 @@ function EmptyCart() {
 
 function CartSkeleton() {
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]" aria-busy="true" aria-label="Carregando carrinho">
-      <div className="space-y-2">
-        {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
-      </div>
-      <Skeleton className="h-64 w-full" />
+    <div aria-busy="true" aria-label="Carregando carrinho">
+      <Skeleton className="h-96 w-full rounded-3xl" />
     </div>
   )
 }

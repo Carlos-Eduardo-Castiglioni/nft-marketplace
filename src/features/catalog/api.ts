@@ -3,18 +3,20 @@ import type { NftDetail, NftListResponse, NftSummary } from '@/lib/api-types'
 import { http } from '@/lib/http'
 import { qk } from '@/lib/query-keys'
 import { STALE } from '@/app/query-client'
-import type { CatalogSearch } from './search'
+import { compactSearch, type CatalogSearch } from './search'
 
 export const PAGE_SIZE = 9
 
-export const nftListQuery = (search: CatalogSearch, pageSize = PAGE_SIZE) =>
-  queryOptions({
+export const nftListQuery = (rawSearch: CatalogSearch, pageSize = PAGE_SIZE) => {
+  const search = compactSearch(rawSearch)
+  return queryOptions({
     queryKey: qk.nfts.list({ ...search, pageSize }),
     queryFn: async ({ signal }) =>
       (await http.get<NftListResponse>('/nfts', { params: { ...search, pageSize }, signal })).data,
     staleTime: STALE.list,
     placeholderData: keepPreviousData,
   })
+}
 
 export const nftDetailQuery = (id: string) =>
   queryOptions({

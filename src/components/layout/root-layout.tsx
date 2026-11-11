@@ -10,11 +10,18 @@ const MockLab = lazy(() => import('@/mocks/mock-lab-panel').then((m) => ({ defau
 export function RootLayout() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <a href="#conteudo" className="sr-only z-50 bg-primary px-4 py-2 font-mono text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+      <a
+        href="#conteudo"
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById('conteudo')?.focus()
+        }}
+        className="sr-only z-50 bg-primary px-4 py-2 font-mono text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
         Pular para o conteúdo
       </a>
       <Header />
-      <main id="conteudo" className="flex-1" tabIndex={-1}>
+      {/* altura mínima: o rodapé nunca começa visível e "pula" quando o conteúdo carrega (CLS) */}
+      <main id="conteudo" className="min-h-[calc(100dvh-4rem)] flex-1 outline-none" tabIndex={-1}>
         <Outlet />
       </main>
       <Footer />

@@ -1,4 +1,6 @@
-import { toggleInCsv, validateCatalogSearch } from './search'
+import { compactSearch, toggleInCsv, validateCatalogSearch as v } from './search'
+
+const validateCatalogSearch = (i: Record<string, unknown>) => compactSearch(v(i))
 
 describe('validateCatalogSearch', () => {
   it('normaliza e remove valores padrão', () => {
@@ -25,4 +27,10 @@ describe('validateCatalogSearch', () => {
     expect(toggleInCsv('a,b', 'a')).toBe('b')
     expect(toggleInCsv('a', 'a')).toBeUndefined()
   })
+})
+
+it('mantém chaves inválidas como undefined (não vazam da busca bruta)', () => {
+  const out = v({ minPrice: 'abc' })
+  expect('minPrice' in out).toBe(true)
+  expect(out.minPrice).toBeUndefined()
 })

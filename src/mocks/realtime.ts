@@ -24,7 +24,8 @@ let paused = false
 export const realtimeHandler = realtime.addEventListener('connection', (connection) => {
   if (paused) {
     // "servidor fora do ar": recusa a conexão para forçar novas tentativas
-    queueMicrotask(() => connection.client.close(1011, 'server unavailable'))
+    // fecha após o "open" do WebSocket; fechar ainda em CONNECTING não emite eventos
+    setTimeout(() => connection.client.close(4000, 'server unavailable'), 30)
     return
   }
   const io = toSocketIo(connection)

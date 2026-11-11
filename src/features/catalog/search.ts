@@ -41,16 +41,23 @@ export const catalogSearchSchema = z.object({
 export type CatalogSearch = z.infer<typeof catalogSearchSchema>
 
 export function validateCatalogSearch(input: Partial<Record<keyof CatalogSearch, unknown>>): CatalogSearch {
-  const parsed = catalogSearchSchema.parse(input)
-  // remove chaves vazias para manter a URL limpa
-  const clean = Object.fromEntries(Object.entries(parsed).filter(([, v]) => v !== undefined && v !== '')) as CatalogSearch
+  const clean = catalogSearchSchema.parse(input)
+  // Mantém TODAS as chaves (mesmo `undefined`): o TanStack Router mescla a busca
+  // validada sobre a busca bruta, então omitir uma chave deixaria o valor
+  // inválido original vazar para o componente. `undefined` some da URL.
+  if (clean.q === '') clean.q = undefined
   if (clean.minPrice !== undefined && clean.maxPrice !== undefined && clean.minPrice > clean.maxPrice) {
     ;[clean.minPrice, clean.maxPrice] = [clean.maxPrice, clean.minPrice]
   }
-  if (clean.page === 1) delete clean.page
-  if (clean.sort === 'recent') delete clean.sort
-  if (clean.tab === 'all') delete clean.tab
+  if (clean.page === 1) clean.page = undefined
+  if (clean.sort === 'recent') clean.sort = undefined
+  if (clean.tab === 'all') clean.tab = undefined
   return clean
+}
+
+/** Remove chaves vazias (para comparar / montar query keys estáveis). */
+export function compactSearch(s: CatalogSearch): CatalogSearch {
+  return Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined)) as CatalogSearch
 }
 
 export const toList = (csvValue?: string) => (csvValue ? csvValue.split(',') : [])

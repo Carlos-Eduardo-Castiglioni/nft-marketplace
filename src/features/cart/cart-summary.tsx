@@ -12,7 +12,10 @@ export function CouponForm({ cart, variant = 'desktop' }: { cart: Cart; variant?
   const [code, setCode] = useState('')
   const apply = useApplyCoupon()
   const remove = useRemoveCoupon()
-  const error = apply.error?.code === 'INVALID_COUPON' ? apply.error.message : apply.error ? apply.error.message : null
+  const error = apply.error ? apply.error.message : null
+  const submit = () => {
+    if (code.trim()) apply.mutate(code.trim(), { onSuccess: () => setCode('') })
+  }
 
   if (cart.coupon) {
     return (
@@ -27,13 +30,8 @@ export function CouponForm({ cart, variant = 'desktop' }: { cart: Cart; variant?
     )
   }
   return (
-    <form
-      noValidate
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (code.trim()) apply.mutate(code.trim(), { onSuccess: () => setCode('') })
-      }}
-    >
+    // div (não <form>) para poder ser usado dentro do formulário de checkout
+    <div role="group" aria-label="Código promocional">
       <label htmlFor={`coupon-${variant}`} className={cn('mb-2 block font-mono text-[11px] font-bold', variant === 'mobile' && 'sr-only')}>
         Código promocional
       </label>
@@ -42,6 +40,12 @@ export function CouponForm({ cart, variant = 'desktop' }: { cart: Cart; variant?
           id={`coupon-${variant}`}
           value={code}
           onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              submit()
+            }
+          }}
           placeholder="Digite o código promocional..."
           aria-invalid={!!error}
           aria-describedby={error ? `coupon-${variant}-error` : `coupon-${variant}-hint`}
@@ -51,7 +55,8 @@ export function CouponForm({ cart, variant = 'desktop' }: { cart: Cart; variant?
           )}
         />
         <Button
-          type="submit"
+          type="button"
+          onClick={submit}
           size="sm"
           loading={apply.isPending}
           className={cn('rounded-none text-[11px]', variant === 'mobile' && 'h-12 rounded-full bg-copper px-5')}
@@ -68,7 +73,7 @@ export function CouponForm({ cart, variant = 'desktop' }: { cart: Cart; variant?
           Experimente KURIO10 ou LAUNCH
         </p>
       )}
-    </form>
+    </div>
   )
 }
 

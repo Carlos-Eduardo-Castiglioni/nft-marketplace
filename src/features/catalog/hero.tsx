@@ -26,6 +26,10 @@ export function Hero() {
           </p>
           <a
             href="#catalogo"
+            onClick={(e) => {
+              e.preventDefault()
+              document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' })
+            }}
             className="mt-5 inline-flex items-center gap-2 font-mono text-[11px] font-bold text-primary md:h-8 md:rounded md:bg-primary md:px-5 md:text-primary-foreground md:hover:bg-primary-strong"
           >
             EXPLORAR <ArrowRight className="size-3.5 md:hidden" aria-hidden />

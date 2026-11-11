@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { LoginForm, RegisterForm } from './auth-forms'
@@ -6,6 +6,7 @@ import { LoginForm, RegisterForm } from './auth-forms'
 type Mode = 'login' | 'register'
 
 interface Ctx {
+  returnFocus: React.RefObject<HTMLElement | null>
   open: (mode?: Mode, opts?: { onSuccess?: () => void }) => void
   close: () => void
   state: { open: boolean; mode: Mode; onSuccess?: () => void }
@@ -16,10 +17,15 @@ const AuthDialogContext = createContext<Ctx | null>(null)
 
 export function AuthDialogProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Ctx['state']>({ open: false, mode: 'login' })
-  const open = useCallback<Ctx['open']>((mode = 'login', opts) => setState({ open: true, mode, onSuccess: opts?.onSuccess }), [])
+  // o modal é aberto programaticamente: guardamos quem tinha o foco para devolvê-lo
+  const returnFocus = useRef<HTMLElement | null>(null)
+  const open = useCallback<Ctx['open']>((mode = 'login', opts) => {
+    returnFocus.current = document.activeElement as HTMLElement | null
+    setState({ open: true, mode, onSuccess: opts?.onSuccess })
+  }, [])
   const close = useCallback(() => setState((s) => ({ ...s, open: false })), [])
   const setMode = useCallback((mode: Mode) => setState((s) => ({ ...s, mode })), [])
-  const value = useMemo(() => ({ open, close, state, setMode }), [open, close, state, setMode])
+  const value = useMemo(() => ({ open, close, state, setMode, returnFocus }), [open, close, state, setMode])
   return <AuthDialogContext.Provider value={value}>{children}</AuthDialogContext.Provider>
 }
 
@@ -31,14 +37,23 @@ export function useAuthDialog() {
 
 /** Modal "Entrar | Criar conta" do header (Figma desktop). */
 export function AuthDialog() {
-  const { state, close, setMode } = useAuthDialog()
+  const { state, close, setMode, returnFocus } = useAuthDialog()
   const done = () => {
     close()
     state.onSuccess?.()
   }
   return (
     <Dialog open={state.open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent
+        className="max-w-sm"
+        onCloseAutoFocus={(e) => {
+          const el = returnFocus.current
+          if (el && document.contains(el)) {
+            e.preventDefault()
+            el.focus()
+          }
+        }}
+      >
         <div className="mb-2 flex items-center justify-center gap-2 font-mono text-sm" role="tablist" aria-label="Acesso">
           {(['login', 'register'] as const).map((m, i) => (
             <span key={m} className="flex items-center gap-2">

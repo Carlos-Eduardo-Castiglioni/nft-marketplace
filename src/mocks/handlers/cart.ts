@@ -156,10 +156,15 @@ export const cartHandlers = [
   ),
 ]
 
+/** Hash de transação fictício, determinístico por pedido (FNV-1a encadeado). */
 function fakeTxHash(seed: string) {
-  let h = 0n
-  for (const ch of seed) h = (h * 131n + BigInt(ch.charCodeAt(0))) % 2n ** 160n
-  return `0x${h.toString(16).padStart(40, '0')}${seed.replace(/-/g, '').slice(0, 24)}`
+  let out = ''
+  let h = 0x811c9dc5
+  for (let round = 0; out.length < 64; round++) {
+    for (const ch of `${seed}:${round}`) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0
+    out += h.toString(16).padStart(8, '0')
+  }
+  return `0x${out.slice(0, 64)}`
 }
 
 export const orderHandlers = [
