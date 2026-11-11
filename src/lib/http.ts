@@ -3,11 +3,14 @@ import type { ApiErrorBody } from './api-types'
 import { safeStorage, uuid } from './utils'
 
 const TOKEN_KEY = 'kurio:token'
+// fallback em memória para ambientes sem storage (aba privada, iframe sandbox)
+const memory: Record<string, string | null> = {}
 const CART_KEY = 'kurio:cart-id'
 
 export const credentials = {
-  getToken: () => safeStorage()?.getItem(TOKEN_KEY) ?? null,
+  getToken: () => safeStorage()?.getItem(TOKEN_KEY) ?? memory[TOKEN_KEY] ?? null,
   setToken: (t: string | null) => {
+    memory[TOKEN_KEY] = t
     const s = safeStorage()
     if (!s) return
     if (t) s.setItem(TOKEN_KEY, t)
@@ -15,9 +18,10 @@ export const credentials = {
   },
   getCartId: () => {
     const s = safeStorage()
-    let id = s?.getItem(CART_KEY)
+    let id = s?.getItem(CART_KEY) ?? memory[CART_KEY]
     if (!id) {
       id = `cart-${uuid()}`
+      memory[CART_KEY] = id
       s?.setItem(CART_KEY, id)
     }
     return id

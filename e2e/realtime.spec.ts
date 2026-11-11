@@ -37,3 +37,15 @@ test('nenhum WebSocket real sai do navegador (tudo interceptado pelo MSW)', asyn
   await app.waitRealtime()
   expect(real).toEqual([])
 })
+
+test('modo inline (sem Service Worker): REST e Socket.IO continuam simulados', async ({ page, app }) => {
+  const real: string[] = []
+  page.on('websocket', (ws) => real.push(ws.url()))
+  await app.goto('/nft/golden-signal-160?mockMode=inline')
+  expect(await page.evaluate(() => window.__kurioMockMode)).toBe('inline')
+  await app.waitRealtime()
+  await expect(page.getByTestId('detail-price')).toHaveText(/0\.39 ETH/)
+  await app.mock((lab) => lab.changePrice('golden-signal-160', '0.45'))
+  await expect(page.getByTestId('detail-price')).toHaveText(/0\.45 ETH/)
+  expect(real).toEqual([])
+})

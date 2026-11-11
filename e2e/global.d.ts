@@ -11,4 +11,5 @@ interface KurioMockLab {
 }
 interface Window {
   __kurioMock?: KurioMockLab
+  __kurioMockMode?: 'service-worker' | 'inline'
 }

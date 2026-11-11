@@ -11,6 +11,7 @@ npm run dev          # http://localhost:5173
 npm test             # testes unitários (Vitest)
 npm run e2e          # testes E2E (Playwright: desktop + mobile)
 npm run build && npm run lighthouse   # auditoria Lighthouse (gera lighthouse-report/)
+npm run build:standalone   # build estático com hash router (funciona em qualquer subpasta, sem Service Worker)
 ```
 
 **Conta de demonstração:** `contato@email.com` / `Kurio@123` (já vem com as carteiras Principal e Reserva).
@@ -59,6 +60,11 @@ Pela URL: `?mock=<rota>:<cenário>[:vezes]` (ex.: `?mock=nfts.list:server-error:
 Pelo console ou pelos testes: `window.__kurioMock.setScenario('orders.create', 'timeout-after-commit', { times: 2 })`.
 
 Cenários: `slow`, `server-error`, `bad-request`, `not-found`, `unauthorized`, `conflict`, `timeout`, `timeout-after-commit`, `network-error`.
+
+## Modos do backend simulado
+
+- **Service Worker (padrão):** o MSW intercepta as requisições do Axios.
+- **Inline (fallback):** quando o Service Worker não pode ser registrado (iframe, WebView, aba privada) ou com `?mockMode=inline`, o MSW intercepta `fetch`/XHR na própria página e o WebSocket é interceptado com `@mswjs/interceptors`.
 
 ## Testes
 

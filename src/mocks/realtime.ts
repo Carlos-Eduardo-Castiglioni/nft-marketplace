@@ -21,7 +21,9 @@ interface Conn {
 const connections = new Set<Conn>()
 let paused = false
 
-export const realtimeHandler = realtime.addEventListener('connection', (connection) => {
+type RealtimeConnection = Parameters<typeof toSocketIo>[0]
+
+export function handleRealtimeConnection(connection: RealtimeConnection) {
   if (paused) {
     // "servidor fora do ar": recusa a conexão para forçar novas tentativas
     // fecha após o "open" do WebSocket; fechar ainda em CONNECTING não emite eventos
@@ -41,7 +43,9 @@ export const realtimeHandler = realtime.addEventListener('connection', (connecti
     connections.delete(conn)
   })
   io.client.on('ping:kurio', () => io.client.emit('pong:kurio', { at: new Date().toISOString() }))
-})
+}
+
+export const realtimeHandler = realtime.addEventListener('connection', handleRealtimeConnection)
 
 export function broadcast(event: 'nft.updated', payload: NftUpdatedEvent): void
 export function broadcast(event: 'order.updated', payload: OrderUpdatedEvent): void
