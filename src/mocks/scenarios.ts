@@ -1,0 +1,116 @@
+/**
+ * Cenários determinísticos de rede. Cada rota da API simulada tem uma chave
+ * (ex.: "nfts.list") e pode receber um cenário — opcionalmente por N chamadas.
+ *
+ *   window.__kurioMock.setScenario('orders.create', 'timeout-after-commit', { times: 1 })
+ *
+ * Também é possível ativar pela URL: ?mock=nfts.list:server-error
+ */
+
+export type ScenarioKind =
+  | 'ok'
+  | 'slow'
+  | 'server-error'
+  | 'bad-request'
+  | 'not-found'
+  | 'unauthorized'
+  | 'conflict'
+  | 'timeout'
+  | 'timeout-after-commit'
+  | 'network-error'
+
+export const SCENARIO_KINDS: ScenarioKind[] = [
+  'ok',
+  'slow',
+  'server-error',
+  'bad-request',
+  'not-found',
+  'unauthorized',
+  'conflict',
+  'timeout',
+  'timeout-after-commit',
+  'network-error',
+]
+
+export type RouteKey =
+  | 'auth.session'
+  | 'auth.login'
+  | 'auth.register'
+  | 'nfts.list'
+  | 'nfts.detail'
+  | 'nfts.related'
+  | 'nfts.favorite'
+  | 'cart.get'
+  | 'cart.mutate'
+  | 'orders.create'
+  | 'orders.list'
+  | 'profile'
+  | 'wallets'
+
+export const ROUTE_KEYS: RouteKey[] = [
+  'auth.session',
+  'auth.login',
+  'auth.register',
+  'nfts.list',
+  'nfts.detail',
+  'nfts.related',
+  'nfts.favorite',
+  'cart.get',
+  'cart.mutate',
+  'orders.create',
+  'orders.list',
+  'profile',
+  'wallets',
+]
+
+interface ActiveScenario {
+  kind: ScenarioKind
+  /** quantas requisições ainda serão afetadas (Infinity = até limpar) */
+  remaining: number
+}
+
+const active = new Map<RouteKey, ActiveScenario>()
+
+export const mockConfig = {
+  /** latência base de toda resposta (ms) — determinística, sem jitter */
+  latency: 250,
+  slowLatency: 2500,
+}
+
+export function setScenario(route: RouteKey, kind: ScenarioKind, opts: { times?: number } = {}) {
+  if (kind === 'ok') active.delete(route)
+  else active.set(route, { kind, remaining: opts.times ?? Infinity })
+}
+
+export function clearScenarios() {
+  active.clear()
+}
+
+export function listScenarios() {
+  return Object.fromEntries([...active.entries()].map(([k, v]) => [k, { ...v }]))
+}
+
+/** Consome (decrementa) o cenário ativo para a rota. */
+export function consumeScenario(route: RouteKey): ScenarioKind {
+  const s = active.get(route)
+  if (!s) return 'ok'
+  s.remaining -= 1
+  if (s.remaining <= 0) active.delete(route)
+  return s.kind
+}
+
+export function initScenariosFromEnvironment() {
+  try {
+    const latency = localStorage.getItem('kurio:mock-latency')
+    if (latency !== null && !Number.isNaN(Number(latency))) mockConfig.latency = Number(latency)
+    const params = new URLSearchParams(window.location.search)
+    for (const entry of params.getAll('mock')) {
+      const [route, kind, times] = entry.split(':')
+      if (ROUTE_KEYS.includes(route as RouteKey) && SCENARIO_KINDS.includes(kind as ScenarioKind)) {
+        setScenario(route as RouteKey, kind as ScenarioKind, { times: times ? Number(times) : undefined })
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}

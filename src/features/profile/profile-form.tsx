@@ -1,0 +1,128 @@
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { ImageIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Field } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { passwordRule } from '@/features/auth/schemas'
+import { useProfile, useUpdateProfile } from './api'
+
+const schema = z
+  .object({
+    displayName: z.string().trim().min(2, 'Mínimo de 2 caracteres.'),
+    username: z.string().trim().min(3, 'Mínimo de 3 caracteres.').regex(/^[a-z0-9_.]+$/i, 'Use letras, números, "_" ou ".".'),
+    email: z.string().trim().email('E-mail inválido.'),
+    ensName: z.string().trim().regex(/^[a-z0-9-]*$/i, 'Somente letras, números e hífen.').min(1, 'Informe o nome ENS.'),
+    walletNickname: z.string().trim().min(1, 'Informe um apelido.'),
+    currentPassword: z.string().optional(),
+    newPassword: z.union([z.literal(''), passwordRule]).optional(),
+    confirmPassword: z.string().optional(),
+  })
+  .refine((d) => !d.newPassword || d.currentPassword, { path: ['currentPassword'], message: 'Informe a senha atual.' })
+  .refine((d) => (d.newPassword ?? '') === (d.confirmPassword ?? ''), { path: ['confirmPassword'], message: 'As senhas não coincidem.' })
+
+type Values = z.infer<typeof schema>
+
+export function ProfileForm() {
+  const { data: profile, isPending } = useProfile()
+  const update = useUpdateProfile()
+  const form = useForm<Values>({ resolver: zodResolver(schema) })
+  const { errors } = form.formState
+
+  useEffect(() => {
+    if (profile)
+      form.reset({
+        displayName: profile.displayName,
+        username: profile.username,
+        email: profile.email,
+        ensName: profile.ensName,
+        walletNickname: profile.walletNickname,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      })
+  }, [profile, form])
+
+  if (isPending) return <Skeleton className="h-[32rem] w-full" />
+
+  const onSubmit = form.handleSubmit(({ confirmPassword: _c, newPassword, currentPassword, ...rest }) =>
+    update.mutate(
+      { ...rest, ...(newPassword ? { newPassword, currentPassword } : {}) },
+      {
+        onSuccess: () => {
+          toast.success('Perfil atualizado!')
+          form.resetField('currentPassword', { defaultValue: '' })
+          form.resetField('newPassword', { defaultValue: '' })
+          form.resetField('confirmPassword', { defaultValue: '' })
+        },
+        onError: (e) => {
+          if (e.field) form.setError(e.field as keyof Values, { message: e.message })
+          else toast.error(e.message)
+        },
+      },
+    ),
+  )
+
+  return (
+    <form onSubmit={onSubmit} noValidate aria-labelledby="profile-heading" className="max-w-2xl">
+      <h1 id="profile-heading" className="mb-5 text-xs font-bold">
+        Perfil do colecionador
+      </h1>
+      <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+        <Field label="Nome de exibição" required error={errors.displayName?.message}>
+          <Input className="h-9" autoComplete="name" {...form.register('displayName')} />
+        </Field>
+        <Field label="Nome de usuário" required error={errors.username?.message}>
+          <Input className="h-9" autoComplete="username" {...form.register('username')} />
+        </Field>
+        <Field label="E-mail" required error={errors.email?.message}>
+          <Input className="h-9" type="email" autoComplete="email" {...form.register('email')} />
+        </Field>
+        <Field label="Nome ENS" required error={errors.ensName?.message}>
+          <div className="flex gap-2">
+            <span className="flex h-9 items-center rounded-md border border-input px-2 text-xs text-muted">.eth</span>
+            <Input className="h-9" {...form.register('ensName')} aria-label="Nome ENS" />
+          </div>
+        </Field>
+        <Field label="Apelido da carteira" required error={errors.walletNickname?.message}>
+          <Input className="h-9" {...form.register('walletNickname')} />
+        </Field>
+        <div className="flex flex-col gap-1.5">
+          <span className="font-mono text-xs font-medium">Avatar</span>
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-full bg-surface-3 text-primary" aria-hidden>
+              <ImageIcon className="size-4" />
+            </span>
+            <Button type="button" size="sm" onClick={() => toast.info('Upload de avatar simulado.')}>
+              Alterar
+            </Button>
+            <Button type="button" size="sm" variant="ghost">
+              Remover
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <fieldset className="mt-8 max-w-sm space-y-4">
+        <legend className="mb-4 text-xs font-bold">Alterar senha</legend>
+        <Field label="Senha atual" error={errors.currentPassword?.message}>
+          <PasswordInput className="h-9" autoComplete="current-password" {...form.register('currentPassword')} />
+        </Field>
+        <Field label="Nova senha" error={errors.newPassword?.message}>
+          <PasswordInput className="h-9" autoComplete="new-password" {...form.register('newPassword')} />
+        </Field>
+        <Field label="Confirmar nova senha" error={errors.confirmPassword?.message}>
+          <PasswordInput className="h-9" autoComplete="new-password" {...form.register('confirmPassword')} />
+        </Field>
+      </fieldset>
+      <Button type="submit" size="sm" className="mt-6 px-8" loading={update.isPending}>
+        Salvar
+      </Button>
+    </form>
+  )
+}

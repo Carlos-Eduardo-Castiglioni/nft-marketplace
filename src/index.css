@@ -1,0 +1,113 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* Tema Kurio — exclusivamente dark, tons de marrom profundo com destaque cobre. */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-background: #130d0b;
+  --color-surface: #1d1512;
+  --color-surface-2: #261b17;
+  --color-surface-3: #31231d;
+  --color-border: #3b2b24;
+  --color-input: #3b2b24;
+  --color-foreground: #f4ece7;
+  --color-muted: #c49a78;
+  --color-subtle: #9c7a62;
+  --color-primary: #d38b4d;
+  --color-primary-strong: #e39d5f;
+  --color-primary-deep: #a8703f;
+  --color-primary-foreground: #1a110d;
+  --color-band: #3a2416;
+  --color-destructive: #ef6a5f;
+  --color-success: #6cc28a;
+  --color-warning: #f0b35a;
+  --color-ring: #e39d5f;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-pulse-ring: pulse-ring 1.2s ease-out 2;
+
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgb(227 157 95 / 0.6);
+    }
+    100% {
+      box-shadow: 0 0 0 10px rgb(227 157 95 / 0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-background);
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: rgb(211 139 77 / 0.35);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-subtle);
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility shimmer {
+  background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-surface-3) 37%, var(--color-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility bg-copper {
+  background-image: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-deep) 100%);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
