@@ -15,8 +15,10 @@ export function clearPrivateData(qc: QueryClient) {
   qc.removeQueries({ queryKey: qk.profile })
   qc.removeQueries({ queryKey: qk.favorites })
   qc.removeQueries({ queryKey: qk.cart })
-  // listas/detalhes carregam o flag `favorite` do usuário
-  qc.invalidateQueries({ queryKey: qk.nfts.all })
+  // Listas e detalhes carregam o flag `favorite` do usuário. `reset` descarta os dados
+  // em cache (em vez de só marcá-los como obsoletos) e refaz as consultas ativas,
+  // para que o próximo usuário nunca veja, nem por um instante, os favoritos do anterior.
+  void qc.resetQueries({ queryKey: qk.nfts.all })
 }
 
 /** Sessão expirou no servidor: mantém o carrinho do usuário no servidor para a retomada. */

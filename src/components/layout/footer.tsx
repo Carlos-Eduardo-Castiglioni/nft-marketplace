@@ -39,8 +39,10 @@ export function Footer() {
             e.preventDefault()
             if (!emailSchema.safeParse(email).success) return setError('Informe um e-mail válido.')
             setError(null)
-            setEmail('')
-            toast.success('Inscrição confirmada! Você receberá os próximos lançamentos.')
+            // Newsletter está fora do escopo da entrega: não simulamos uma inscrição bem-sucedida.
+            toast.info('Newsletter indisponível nesta demonstração.', {
+              description: 'Nenhuma inscrição foi realizada.',
+            })
           }}
         >
           <h3 className="mb-3 font-mono text-xs font-bold">Antecipe-se ao próximo lançamento</h3>
