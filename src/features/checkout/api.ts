@@ -15,11 +15,15 @@ export const ordersQuery = queryOptions({
   staleTime: STALE.orders,
 })
 
+/** Enquanto pendente, além do `order.updated`, consulta o REST periodicamente (fallback). */
+export const PENDING_POLL_MS = 5_000
+
 export const orderQuery = (id: string) =>
   queryOptions({
     queryKey: qk.orders.detail(id),
     queryFn: async ({ signal }) => (await http.get<Order>(`/orders/${id}`, { signal })).data,
     staleTime: STALE.orders,
+    refetchInterval: (q) => (q.state.data?.status === 'pending' ? PENDING_POLL_MS : false),
   })
 
 export const useOrders = () => useQuery(ordersQuery)
@@ -29,6 +33,8 @@ export interface CreateOrderInput {
   cartVersion: number
   walletId: string
   provider: WalletProvider
+  /** total da cotação revisada pelo usuário; o servidor recusa se mudou */
+  total: string
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -74,14 +80,13 @@ export function useCreateOrder() {
     onSuccess: (order) => {
       idempotency.clear()
       qc.setQueryData(qk.orders.detail(order.id), order)
-      qc.invalidateQueries({ queryKey: qk.orders.all })
-      qc.invalidateQueries({ queryKey: qk.cart })
-      qc.invalidateQueries({ queryKey: qk.nfts.all })
+      qc.invalidateQueries({ queryKey: qk.orders.all, exact: true })
     },
     onError: (e: ApiError) => {
-      if (e.code === 'PRICE_CHANGED' || e.code === 'CART_VERSION_MISMATCH' || e.code === 'OUT_OF_STOCK') {
+      if (['PRICE_CHANGED', 'CART_VERSION_MISMATCH', 'OUT_OF_STOCK', 'QUOTE_CHANGED'].includes(e.code)) {
         qc.invalidateQueries({ queryKey: qk.cart })
       }
+      if (e.code === 'ORDER_PENDING') qc.invalidateQueries({ queryKey: qk.orders.all })
     },
     meta: { silent: true },
   })

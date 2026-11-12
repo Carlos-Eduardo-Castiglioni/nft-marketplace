@@ -1,7 +1,30 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { Session } from '@/lib/api-types'
 import { ApiError, credentials, http } from '@/lib/http'
 import { qk } from '@/lib/query-keys'
+import { idempotency } from '@/features/checkout/idempotency'
+
+/**
+ * Remove do cache tudo que pertence a um usuário. Usado no login (troca de
+ * usuário), logout e expiração: nenhum dado privado sobrevive à sessão anterior.
+ * O socket da sessão anterior é encerrado pelo RealtimeProvider (depende do token).
+ */
+export function clearPrivateData(qc: QueryClient) {
+  qc.removeQueries({ queryKey: qk.orders.all })
+  qc.removeQueries({ queryKey: qk.wallets })
+  qc.removeQueries({ queryKey: qk.profile })
+  qc.removeQueries({ queryKey: qk.favorites })
+  qc.removeQueries({ queryKey: qk.cart })
+  // listas/detalhes carregam o flag `favorite` do usuário
+  qc.invalidateQueries({ queryKey: qk.nfts.all })
+}
+
+/** Sessão expirou no servidor: mantém o carrinho do usuário no servidor para a retomada. */
+export function expireSession(qc: QueryClient) {
+  credentials.setToken(null)
+  qc.setQueryData(qk.session, null)
+  clearPrivateData(qc)
+}
 
 export const sessionQuery = queryOptions({
   queryKey: qk.session,
@@ -38,14 +61,12 @@ export interface RegisterInput {
 function useOnSession() {
   const qc = useQueryClient()
   return (session: Session) => {
+    const previous = qc.getQueryData<Session | null>(qk.session)
     credentials.setToken(session.token)
+    if (previous && previous.user.id !== session.user.id) idempotency.clear()
+    // dados pessoais dependem do usuário; o carrinho do visitante foi mesclado no servidor
+    clearPrivateData(qc)
     qc.setQueryData(qk.session, session)
-    // dados pessoais dependem do usuário
-    qc.invalidateQueries({ queryKey: qk.favorites })
-    qc.invalidateQueries({ queryKey: qk.nfts.all })
-    qc.removeQueries({ queryKey: qk.orders.all })
-    qc.removeQueries({ queryKey: qk.wallets })
-    qc.removeQueries({ queryKey: qk.profile })
   }
 }
 
@@ -83,11 +104,11 @@ export function useLogout() {
     },
     onSettled: () => {
       credentials.setToken(null)
+      // o carrinho ficou com o usuário; o próximo visitante começa um carrinho vazio
+      credentials.rotateCartId()
+      idempotency.clear()
       qc.setQueryData(qk.session, null)
-      qc.removeQueries({ queryKey: qk.orders.all })
-      qc.removeQueries({ queryKey: qk.wallets })
-      qc.removeQueries({ queryKey: qk.profile })
-      qc.invalidateQueries({ queryKey: qk.favorites })
+      clearPrivateData(qc)
     },
   })
 }

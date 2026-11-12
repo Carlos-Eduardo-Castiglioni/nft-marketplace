@@ -125,6 +125,13 @@ const checkoutRoute = createRoute({
   pendingComponent: PageSkeleton,
 })
 
+const orderRoute = createRoute({
+  getParentRoute: () => privateRoute,
+  path: '/orders/$orderId',
+  component: lazyRouteComponent(() => import('@/features/checkout/order-page'), 'OrderPage'),
+  pendingComponent: PageSkeleton,
+})
+
 const profileRoute = createRoute({
   getParentRoute: () => privateRoute,
   path: '/profile',
@@ -166,6 +173,7 @@ const routeTree = rootRoute.addChildren([
   learnRoute,
   privateRoute.addChildren([
     checkoutRoute,
+    orderRoute,
     profileRoute.addChildren([profileIndexRoute, walletsRoute, activityRoute, favoritesRoute]),
   ]),
 ])

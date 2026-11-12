@@ -33,6 +33,8 @@ export interface NftSummary {
   trendingScore: number
   isNew: boolean
   favorite: boolean
+  /** versão do recurso no servidor; cresce a cada mudança de preço/estoque */
+  version: number
 }
 
 export interface NftDetail extends NftSummary {
@@ -119,14 +121,29 @@ export interface Cart {
   hasPriceChanges: boolean
 }
 
+/** `confirmed` e `failed` são terminais: nunca voltam para `pending`. */
 export type OrderStatus = 'pending' | 'confirmed' | 'failed'
 
+export const isTerminalOrder = (status: OrderStatus) => status !== 'pending'
+
+export type OrderLine = Pick<CartLine, 'nftId' | 'name' | 'tokenId' | 'thumb' | 'editionId' | 'editionLabel' | 'quantity' | 'unitPrice'>
+
+/**
+ * Pedido + recibo. Os valores são um SNAPSHOT do momento da criação:
+ * mudanças posteriores no catálogo não alteram o recibo.
+ */
 export interface Order {
   id: string
   txHash: string
   status: OrderStatus
+  /** cresce a cada transição de estado (pending=1, terminal=2) */
+  version: number
   createdAt: string
-  lines: Pick<CartLine, 'nftId' | 'name' | 'tokenId' | 'thumb' | 'editionLabel' | 'quantity' | 'unitPrice'>[]
+  settledAt?: string
+  /** motivo da recusa quando `status === 'failed'` */
+  failureReason?: string
+  lines: OrderLine[]
+  coupon?: { code: string; label: string }
   subtotal: EthString
   discount: EthString
   networkFee: EthString
@@ -142,17 +159,30 @@ export interface ApiErrorBody {
   details?: unknown
 }
 
-/** Eventos do Socket.IO simulado */
+/**
+ * Eventos do Socket.IO simulado. Todos carregam:
+ * - `eventId`: identidade estável (duplicatas são descartadas pelo cliente);
+ * - `id`: recurso afetado;
+ * - `version`: versão do recurso após a mudança (eventos antigos são ignorados).
+ */
 export interface NftUpdatedEvent {
+  eventId: string
   id: string
+  version: number
   editionId?: EditionId
+  /** novo preço base (edição 1/50, a mesma exibida no catálogo) */
   price?: EthString
   stock?: number
   at: string
 }
 
 export interface OrderUpdatedEvent {
+  eventId: string
   id: string
+  version: number
+  /** dono do pedido — o cliente descarta eventos de outro usuário */
+  userId: string
   status: OrderStatus
+  failureReason?: string
   at: string
 }

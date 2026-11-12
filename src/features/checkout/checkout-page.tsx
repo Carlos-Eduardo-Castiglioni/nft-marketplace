@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ChevronLeft, MoreVertical, Wallet as WalletIcon } from 'lucide-react'
-import type { Cart, Order, Wallet, WalletProvider } from '@/lib/api-types'
+import type { Cart, Wallet, WalletProvider } from '@/lib/api-types'
 import { Breadcrumbs } from '@/components/layout/breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { Eth } from '@/components/ui/eth'
@@ -17,10 +17,9 @@ import { lineTotal } from '@/lib/cart-math'
 import { shortAddress } from '@/lib/utils'
 import { useSession } from '@/features/auth/api'
 import { useCart } from '@/features/cart/api'
-import { CouponForm, PriceChangeAlert, Totals } from '@/features/cart/cart-summary'
+import { CouponForm, PriceChangeAlert, StockAlert, Totals, hasStockIssues } from '@/features/cart/cart-summary'
 import { useWallets } from '@/features/profile/api'
-import { useCreateOrder } from './api'
-import { OrderSuccessDialog } from './order-success-dialog'
+import { useCreateOrder, useOrders } from './api'
 
 export const PROVIDERS: { id: WalletProvider; label: string; letter: string }[] = [
   { id: 'walletconnect', label: 'WalletConnect', letter: 'W' },
@@ -46,7 +45,8 @@ export function CheckoutPage() {
   const cartQuery = useCart()
   const walletsQuery = useWallets()
   const createOrder = useCreateOrder()
-  const [placedOrder, setPlacedOrder] = useState<Order | null>(null)
+  const ordersQuery = useOrders()
+  const pendingOrder = ordersQuery.data?.find((o) => o.status === 'pending')
   // snapshot do carrinho no envio: se o servidor efetivou o pedido mas a resposta
   // se perdeu, o carrinho "real" já está vazio — mantemos o resumo para o retry.
   const [submittedCart, setSubmittedCart] = useState<Cart | null>(null)
@@ -66,20 +66,26 @@ export function CheckoutPage() {
     }
   }, [walletsQuery.data, form])
 
-  const inFlight = createOrder.isPending || (createOrder.isError && createOrder.error.isRetryable)
-  const cart = inFlight && submittedCart ? submittedCart : cartQuery.data
-  const blocked = !!cart?.hasPriceChanges
-  const submit = form.handleSubmit((values) => {
-    if (!cart || blocked) return
+  const attemptOpen = createOrder.isPending || (createOrder.isError && createOrder.error.isRetryable)
+  const cart = attemptOpen && submittedCart ? submittedCart : cartQuery.data
+  const priceBlocked = !!cart?.hasPriceChanges
+  const blocked = priceBlocked || (!!cart && hasStockIssues(cart))
+  const goToOrder = (orderId: string) => navigate({ to: '/orders/$orderId', params: { orderId } })
+  // trava síncrona contra clique repetido (o estado `isPending` só muda no próximo render)
+  const inFlight = useRef(false)
+  const placeOrder = (values: CheckoutValues) => {
+    if (!cart || blocked || inFlight.current) return
+    inFlight.current = true
     setSubmittedCart(cart)
     createOrder.mutate(
-      { cartVersion: cart.version, walletId: values.walletId, provider: values.provider },
-      { onSuccess: (order) => setPlacedOrder(order) },
+      { cartVersion: cart.version, walletId: values.walletId, provider: values.provider, total: cart.total },
+      { onSuccess: (order) => goToOrder(order.id), onSettled: () => (inFlight.current = false) },
     )
-  })
+  }
 
   const error = createOrder.error
   const recoverable = error?.isRetryable
+  const pendingFromError = error?.code === 'ORDER_PENDING' ? (error.details as { orderId?: string } | undefined)?.orderId : undefined
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6 md:pt-6">
@@ -98,7 +104,7 @@ export function CheckoutPage() {
           <Skeleton className="h-96 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
-      ) : !cart || (cart.lines.length === 0 && !placedOrder) ? (
+      ) : !cart || cart.lines.length === 0 ? (
         <div className="rounded-3xl bg-surface p-10 text-center font-mono">
           <p className="text-sm font-bold">Não há itens para pagar</p>
           <Button asChild className="mt-6">
@@ -106,7 +112,7 @@ export function CheckoutPage() {
           </Button>
         </div>
       ) : (
-        <form onSubmit={submit} noValidate className="grid gap-8 lg:grid-cols-[1fr_22rem]" aria-label="Pagamento">
+        <form onSubmit={(e) => form.handleSubmit(placeOrder)(e)} noValidate className="grid gap-8 lg:grid-cols-[1fr_22rem]" aria-label="Pagamento">
           <div className="space-y-8 font-mono">
             <section aria-labelledby="wallet-title">
               <div className="mb-3 flex items-center justify-between">
@@ -202,8 +208,23 @@ export function CheckoutPage() {
             </fieldset>
 
             <PriceChangeAlert cart={cart} />
+            <StockAlert cart={cart} />
 
-            {error && !blocked && (
+            {(pendingOrder || pendingFromError) && (
+              <Alert
+                variant="info"
+                title="Há um pedido aguardando confirmação"
+                action={
+                  <Button type="button" size="sm" onClick={() => goToOrder(pendingFromError ?? pendingOrder!.id)}>
+                    Acompanhar pedido
+                  </Button>
+                }
+              >
+                Aguarde a confirmação da rede antes de comprar novamente — assim você não paga duas vezes.
+              </Alert>
+            )}
+
+            {error && !blocked && !pendingFromError && (
               <Alert
                 variant="error"
                 title={recoverable ? 'Não conseguimos confirmar seu pedido' : error.message}
@@ -216,7 +237,7 @@ export function CheckoutPage() {
                       data-testid="retry-order"
                       // reenvia exatamente a mesma intenção (mesma chave de idempotência),
                       // mesmo que o carrinho em cache já tenha sido revalidado
-                      onClick={() => createOrder.variables && createOrder.mutate(createOrder.variables, { onSuccess: setPlacedOrder })}
+                      onClick={() => createOrder.variables && createOrder.mutate(createOrder.variables, { onSuccess: (o) => goToOrder(o.id) })}
                     >
                       Tentar novamente
                     </Button>
@@ -238,7 +259,7 @@ export function CheckoutPage() {
               variant="gradient"
               size="pill"
               className="w-full"
-              disabled={blocked || !walletsQuery.data?.length}
+              disabled={blocked || !walletsQuery.data?.length || !!pendingOrder}
               loading={createOrder.isPending}
               aria-describedby={blocked ? 'confirm-blocked' : undefined}
               data-testid="confirm-order"
@@ -247,20 +268,13 @@ export function CheckoutPage() {
             </Button>
             {blocked && (
               <p id="confirm-blocked" className="text-center text-[11px] text-warning">
-                Confirmação bloqueada: aceite o novo valor acima.
+                {priceBlocked ? 'Confirmação bloqueada: aceite o novo valor acima.' : 'Confirmação bloqueada: ajuste as quantidades no carrinho.'}
               </p>
             )}
           </aside>
         </form>
       )}
 
-      <OrderSuccessDialog
-        order={placedOrder}
-        onClose={() => {
-          setPlacedOrder(null)
-          navigate({ to: '/profile/activity' })
-        }}
-      />
     </div>
   )
 }

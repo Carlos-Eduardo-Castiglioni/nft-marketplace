@@ -1,0 +1,338 @@
+[
+  {
+    "formFactor": "mobile",
+    "route": "/",
+    "required": true,
+    "runs": 3,
+    "performance": 82,
+    "accessibility": 97,
+    "best-practices": 100,
+    "seo": 92,
+    "LCP_ms": 3592,
+    "CLS": 0.001,
+    "TBT_ms": 241,
+    "samples": [
+      {
+        "performance": 82,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 4065.027,
+        "CLS": 0.0005856438210815134,
+        "TBT": 241.0045
+      },
+      {
+        "performance": 80,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3591.5356,
+        "CLS": 0,
+        "TBT": 207.5
+      },
+      {
+        "performance": 87,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3420.5234,
+        "CLS": 0.0005856438210815134,
+        "TBT": 250
+      }
+    ]
+  },
+  {
+    "formFactor": "mobile",
+    "route": "/nft/emerald-ape-042",
+    "required": true,
+    "runs": 3,
+    "performance": 83,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 92,
+    "LCP_ms": 3942,
+    "CLS": 0,
+    "TBT_ms": 247,
+    "samples": [
+      {
+        "performance": 81,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 4005.0714000000003,
+        "CLS": 0.00004558166918553168,
+        "TBT": 302.98215000000005
+      },
+      {
+        "performance": 85,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3942.476,
+        "CLS": 0.00004558166918553168,
+        "TBT": 192
+      },
+      {
+        "performance": 83,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3940.6913999999997,
+        "CLS": 0.00004558166918553168,
+        "TBT": 246.58642499999996
+      }
+    ]
+  },
+  {
+    "formFactor": "mobile",
+    "route": "/cart",
+    "required": false,
+    "runs": 3,
+    "performance": 87,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 92,
+    "LCP_ms": 3953,
+    "CLS": 0,
+    "TBT_ms": 114,
+    "samples": [
+      {
+        "performance": 87,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3964.9866,
+        "CLS": 0.00004558166918553168,
+        "TBT": 119.00334999999995
+      },
+      {
+        "performance": 88,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3834.5930000000003,
+        "CLS": 0.00004558166918553168,
+        "TBT": 73.5
+      },
+      {
+        "performance": 87,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 3953.2592,
+        "CLS": 0.00004558166918553168,
+        "TBT": 114
+      }
+    ]
+  },
+  {
+    "formFactor": "mobile",
+    "route": "/login",
+    "required": false,
+    "runs": 3,
+    "performance": 98,
+    "accessibility": 98,
+    "best-practices": 100,
+    "seo": 91,
+    "LCP_ms": 759,
+    "CLS": 0.001,
+    "TBT_ms": 177,
+    "samples": [
+      {
+        "performance": 97,
+        "accessibility": 98,
+        "best-practices": 100,
+        "seo": 91,
+        "LCP": 758.5687,
+        "CLS": 0.0009768991916915166,
+        "TBT": 182.71564999999998
+      },
+      {
+        "performance": 99,
+        "accessibility": 98,
+        "best-practices": 100,
+        "seo": 91,
+        "LCP": 758.8534999999999,
+        "CLS": 0.0009768991916915166,
+        "TBT": 116
+      },
+      {
+        "performance": 98,
+        "accessibility": 98,
+        "best-practices": 100,
+        "seo": 91,
+        "LCP": 760.8831,
+        "CLS": 0.0009768991916915166,
+        "TBT": 177
+      }
+    ]
+  },
+  {
+    "formFactor": "desktop",
+    "route": "/",
+    "required": true,
+    "runs": 3,
+    "performance": 100,
+    "accessibility": 97,
+    "best-practices": 100,
+    "seo": 92,
+    "LCP_ms": 821,
+    "CLS": 0.001,
+    "TBT_ms": 0,
+    "samples": [
+      {
+        "performance": 99,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 864.84065,
+        "CLS": 0.0005861568344971606,
+        "TBT": 0
+      },
+      {
+        "performance": 100,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 775.9123999999999,
+        "CLS": 0.0005861568344971606,
+        "TBT": 6
+      },
+      {
+        "performance": 100,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 821.0886,
+        "CLS": 0.0005861568344971606,
+        "TBT": 0
+      }
+    ]
+  },
+  {
+    "formFactor": "desktop",
+    "route": "/nft/emerald-ape-042",
+    "required": true,
+    "runs": 3,
+    "performance": 99,
+    "accessibility": 97,
+    "best-practices": 100,
+    "seo": 92,
+    "LCP_ms": 885,
+    "CLS": 0,
+    "TBT_ms": 0,
+    "samples": [
+      {
+        "performance": 99,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 884.88,
+        "CLS": 0.0002365196594144959,
+        "TBT": 0
+      },
+      {
+        "performance": 99,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 896.4236000000001,
+        "CLS": 0.0002365196594144959,
+        "TBT": 0
+      },
+      {
+        "performance": 99,
+        "accessibility": 97,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 875.3380000000001,
+        "CLS": 0.0002365196594144959,
+        "TBT": 0
+      }
+    ]
+  },
+  {
+    "formFactor": "desktop",
+    "route": "/cart",
+    "required": false,
+    "runs": 3,
+    "performance": 99,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 92,
+    "LCP_ms": 920,
+    "CLS": 0,
+    "TBT_ms": 0,
+    "samples": [
+      {
+        "performance": 99,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 920.4786,
+        "CLS": 0.0002503321343628855,
+        "TBT": 0
+      },
+      {
+        "performance": 99,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 929.8447999999999,
+        "CLS": 0.0002503321343628855,
+        "TBT": 0
+      },
+      {
+        "performance": 99,
+        "accessibility": 100,
+        "best-practices": 100,
+        "seo": 92,
+        "LCP": 890.1777999999999,
+        "CLS": 0.0002503321343628855,
+        "TBT": 0
+      }
+    ]
+  },
+  {
+    "formFactor": "desktop",
+    "route": "/login",
+    "required": false,
+    "runs": 3,
+    "performance": 100,
+    "accessibility": 98,
+    "best-practices": 100,
+    "seo": 91,
+    "LCP_ms": 212,
+    "CLS": 0,
+    "TBT_ms": 0,
+    "samples": [
+      {
+        "performance": 100,
+        "accessibility": 98,
+        "best-practices": 100,
+        "seo": 91,
+        "LCP": 219.95999999999998,
+        "CLS": 0.00039162624832752977,
+        "TBT": 0
+      },
+      {
+        "performance": 100,
+        "accessibility": 98,
+        "best-practices": 100,
+        "seo": 91,
+        "LCP": 209.7418,
+        "CLS": 0.00039162624832752977,
+        "TBT": 0
+      },
+      {
+        "performance": 100,
+        "accessibility": 98,
+        "best-practices": 100,
+        "seo": 91,
+        "LCP": 212.2264,
+        "CLS": 0.00039162624832752977,
+        "TBT": 0
+      }
+    ]
+  }
+]

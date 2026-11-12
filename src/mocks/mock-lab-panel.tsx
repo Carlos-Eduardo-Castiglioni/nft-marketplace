@@ -9,7 +9,7 @@ import type { Cart } from '@/lib/api-types'
 import { add, isEthString } from '@/lib/eth'
 import { qk } from '@/lib/query-keys'
 import { mockLab } from './lab'
-import { ROUTE_KEYS, SCENARIO_KINDS, type RouteKey, type ScenarioKind } from './scenarios'
+import { PAYMENT_OUTCOMES, ROUTE_KEYS, SCENARIO_KINDS, type PaymentOutcome, type RouteKey, type ScenarioKind } from './scenarios'
 
 const selectClass = 'h-9 w-full rounded-md border border-border bg-background px-2 font-mono text-xs'
 
@@ -25,6 +25,7 @@ export function MockLabPanel() {
   const [times, setTimes] = useState('1')
   const [nftId, setNftId] = useState(cart?.lines[0]?.nftId ?? 'emerald-ape-042')
   const [price, setPrice] = useState('')
+  const [payment, setPayment] = useState<PaymentOutcome>(mockLab.config.payment)
 
   return (
     <Dialog>
@@ -115,7 +116,53 @@ export function MockLabPanel() {
             <Button size="sm" variant="outline" onClick={() => (mockLab.dropSockets(2000), toast.info('Conexão derrubada por 2s'))}>
               Derrubar socket
             </Button>
+            <Button size="sm" variant="ghost" onClick={() => (mockLab.replayLastEvent(), toast.info('Último evento reenviado (mesmo eventId)'))}>
+              Duplicar evento
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                mockLab.emitStaleNftEvent(nftId, '0.01')
+                toast.info('Evento com versão antiga emitido')
+              }}
+            >
+              Evento antigo
+            </Button>
           </div>
+        </section>
+
+        <section className="mt-4 space-y-3 rounded-xl bg-surface-2 p-4" aria-labelledby="lab-pay">
+          <h3 id="lab-pay" className="font-mono text-xs font-bold text-primary">
+            Pagamento
+          </h3>
+          <div className="space-y-1">
+            <Label htmlFor="lab-payment">Resultado dos próximos pedidos</Label>
+            <select
+              id="lab-payment"
+              className={selectClass}
+              value={payment}
+              onChange={(e) => {
+                const next = e.target.value as PaymentOutcome
+                setPayment(next)
+                mockLab.setPayment(next)
+                try {
+                  localStorage.setItem('kurio:mock-payment', next)
+                } catch {
+                  /* ignore */
+                }
+              }}
+            >
+              {PAYMENT_OUTCOMES.map((o) => (
+                <option key={o} value={o}>
+                  {o === 'confirm' ? 'Confirmar' : o === 'decline' ? 'Recusar' : 'Manual (fica pendente)'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => (mockLab.expireSessions(), toast.info('Sessões expiradas no servidor'))}>
+            Expirar sessão
+          </Button>
         </section>
 
         <div className="mt-4 flex justify-between">

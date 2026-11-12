@@ -71,8 +71,8 @@ export function formatEth(value: EthString, { minDecimals = 2, maxDecimals = 3, 
   if (negative) wei = -wei
   const unit = 10n ** BigInt(ETH_DECIMALS - maxDecimals)
   const rounded = ((wei + unit / 2n) / unit) * unit
-  let [int, frac = ''] = fromWei(rounded).split('.')
-  frac = frac.padEnd(minDecimals, '0')
+  const [int, rawFrac = ''] = fromWei(rounded).split('.')
+  const frac = rawFrac.padEnd(minDecimals, '0')
   const out = `${negative ? '-' : ''}${int}${frac ? `.${frac}` : ''}`
   return symbol ? `${out} ETH` : out
 }

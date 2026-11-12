@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:standalone": "vite build --mode standalone --outDir dist-standalone",
     "preview": "vite preview",
     "typecheck": "tsc -b",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test --trace off",
-    "lighthouse": "node scripts/lighthouse.mjs",
-    "build:standalone": "VITE_STANDALONE=1 VITE_HASH_ROUTER=1 vite build --outDir dist-standalone"
+    "e2e": "playwright test",
+    "e2e:visual": "playwright test --grep @visual",
+    "e2e:update-snapshots": "playwright test --grep @visual --update-snapshots",
+    "e2e:report": "playwright show-report",
+    "lighthouse": "node scripts/lighthouse.mjs"
   },
   "msw": {
     "workerDirectory": [
@@ -48,6 +52,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^9.39.5",
     "@mswjs/interceptors": "^0.39.8",
     "@mswjs/socket.io-binding": "^0.2.0",
     "@playwright/test": "^1.63.0",
@@ -58,11 +63,17 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "chrome-launcher": "^1.2.3",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.14.0",
     "jsdom": "^31.0.0",
     "lighthouse": "^13.6.0",
     "msw": "^2.15.0",
     "tailwindcss": "^4.3.5",
     "typescript": "5.9",
+    "typescript-eslint": "^8.72.2",
     "vite": "^7.3.8",
     "vitest": "^3.2.7"
   }

@@ -11,6 +11,10 @@ test('aritmética decimal exata (0.1 + 0.2 = 0.3) e cupom', async ({ page, app }
   await page.getByRole('button', { name: 'Aplicar' }).first().click()
   await expect(page.getByText('Código promocional inválido ou expirado.')).toBeVisible()
 
+  await coupon.fill('BLACK2025')
+  await page.getByRole('button', { name: 'Aplicar' }).first().click()
+  await expect(page.getByText('Este código promocional expirou.')).toBeVisible()
+
   await coupon.fill('kurio10')
   await page.getByRole('button', { name: 'Aplicar' }).first().click()
   await expect(page.getByTestId('discount')).toHaveText('(-) 0.03 ETH')

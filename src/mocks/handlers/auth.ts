@@ -2,11 +2,18 @@ import { http, HttpResponse } from 'msw'
 import type { NetworkId, Session, Wallet, WalletProvider } from '@/lib/api-types'
 import { uuid } from '@/lib/utils'
 import { db, persist, type UserRecord } from '../db'
-import { apiError, getUser, publicUser, requireUser, withScenario } from '../http'
+import { apiError, getCartId, getUser, publicUser, requireUser, withScenario } from '../http'
+import { mergeVisitorCart } from './cart'
+import { hashPassword, verifyPassword } from '../password'
 
-function createSession(user: UserRecord): Session {
+/** Avatar: data URL de imagem, já redimensionada no cliente (limite de ~200 KB). */
+const AVATAR_MAX_LENGTH = 200_000
+const AVATAR_PATTERN = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/
+
+function createSession(user: UserRecord, request: Request): Session {
   const token = `tok_${uuid()}`
   db.state.sessions[token] = user.id
+  mergeVisitorCart(getCartId(request), user.id)
   persist()
   return { token, user: publicUser(user) }
 }
@@ -30,16 +37,16 @@ export const authHandlers = [
     withScenario('auth.login', async ({ request }) => {
       const { email, password } = (await request.json()) as { email: string; password: string }
       const user = findByEmail(email ?? '')
-      if (!user || user.password !== password) {
+      if (!user || !verifyPassword(password ?? '', user.password)) {
         return apiError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos.')
       }
-      return HttpResponse.json(createSession(user))
+      return HttpResponse.json(createSession(user, request))
     }),
   ),
 
   http.post(
     '*/api/auth/oauth/:provider',
-    withScenario('auth.login', ({ params }) => {
+    withScenario('auth.login', ({ params, request }) => {
       const provider = params.provider as string
       const email = `${provider}.colecionador@email.com`
       let user = findByEmail(email)
@@ -49,13 +56,13 @@ export const authHandlers = [
           username: `${provider}_colecionador`,
           displayName: `Colecionador ${provider === 'google' ? 'Google' : 'Facebook'}`,
           email,
-          password: uuid(),
+          password: hashPassword(uuid(), uuid()),
           ensName: '',
           walletNickname: '',
         }
         db.state.users[user.id] = user
       }
-      return HttpResponse.json(createSession(user))
+      return HttpResponse.json(createSession(user, request))
     }),
   ),
 
@@ -74,12 +81,12 @@ export const authHandlers = [
         username: body.username,
         displayName: body.username,
         email: body.email,
-        password: body.password,
+        password: hashPassword(body.password, uuid()),
         ensName: '',
         walletNickname: '',
       }
       db.state.users[user.id] = user
-      return HttpResponse.json(createSession(user), { status: 201 })
+      return HttpResponse.json(createSession(user, request), { status: 201 })
     }),
   ),
 
@@ -103,19 +110,34 @@ export const profileHandlers = [
     '*/api/profile',
     withScenario('profile', async ({ request }) => {
       const user = requireUser(request)
-      const body = (await request.json()) as Partial<UserRecord> & { currentPassword?: string; newPassword?: string }
+      const body = (await request.json()) as Partial<Omit<UserRecord, 'password' | 'avatarUrl'>> & {
+        avatarUrl?: string | null
+        currentPassword?: string
+        newPassword?: string
+      }
       if (body.email && body.email !== user.email && findByEmail(body.email)) {
         return apiError(409, 'EMAIL_TAKEN', 'Este e-mail já está cadastrado.', { field: 'email' })
       }
+      if (body.username && body.username !== user.username && Object.values(db.state.users).some((u) => u.username === body.username)) {
+        return apiError(409, 'USERNAME_TAKEN', 'Nome de usuário indisponível.', { field: 'username' })
+      }
+      if (typeof body.avatarUrl === 'string' && (body.avatarUrl.length > AVATAR_MAX_LENGTH || !AVATAR_PATTERN.test(body.avatarUrl))) {
+        return apiError(422, 'INVALID_AVATAR', 'Envie uma imagem PNG, JPEG, WebP ou GIF de até 200 KB.', { field: 'avatarUrl' })
+      }
       if (body.newPassword) {
-        if (body.currentPassword !== user.password) {
+        if (!verifyPassword(body.currentPassword ?? '', user.password)) {
           return apiError(422, 'WRONG_PASSWORD', 'Senha atual incorreta.', { field: 'currentPassword' })
         }
-        user.password = body.newPassword
+        if (verifyPassword(body.newPassword, user.password)) {
+          return apiError(422, 'SAME_PASSWORD', 'A nova senha deve ser diferente da atual.', { field: 'newPassword' })
+        }
+        user.password = hashPassword(body.newPassword, uuid())
       }
-      for (const k of ['displayName', 'username', 'email', 'ensName', 'walletNickname', 'avatarUrl'] as const) {
-        if (body[k] !== undefined) (user as unknown as Record<string, unknown>)[k] = body[k]
+      for (const k of ['displayName', 'username', 'email', 'ensName', 'walletNickname'] as const) {
+        if (body[k] !== undefined) user[k] = body[k]
       }
+      if (body.avatarUrl === null) delete user.avatarUrl
+      else if (body.avatarUrl !== undefined) user.avatarUrl = body.avatarUrl
       persist()
       return HttpResponse.json(publicUser(user))
     }),

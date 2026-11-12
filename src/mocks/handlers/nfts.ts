@@ -1,11 +1,11 @@
 import { http, HttpResponse } from 'msw'
 import type { NftDetail, NftListResponse, NftSummary } from '@/lib/api-types'
 import { compare, fromWei, toWei } from '@/lib/eth'
-import { db, persist } from '../db'
-import { ART, COLLECTIONS, DESCRIPTION, EDITIONS, LONG_DESCRIPTION, NETWORKS, REVIEWS, editionPrice, type NftRecord } from '../fixtures/nfts'
+import { db, persist, type NftRow } from '../db'
+import { ART, COLLECTIONS, DESCRIPTION, EDITIONS, LONG_DESCRIPTION, NETWORKS, REVIEWS, editionPrice } from '../fixtures/nfts'
 import { apiError, getOwnerId, withScenario } from '../http'
 
-export function toSummary(n: NftRecord, ownerId: string | null): NftSummary {
+export function toSummary(n: NftRow, ownerId: string | null): NftSummary {
   const collection = COLLECTIONS.find((c) => c.id === n.collection)
   return {
     id: n.id,
@@ -23,10 +23,11 @@ export function toSummary(n: NftRecord, ownerId: string | null): NftSummary {
     trendingScore: n.trendingScore,
     isNew: n.isNew,
     favorite: ownerId ? (db.state.favorites[ownerId] ?? []).includes(n.id) : false,
+    version: n.version,
   }
 }
 
-export function toDetail(n: NftRecord, ownerId: string | null): NftDetail {
+export function toDetail(n: NftRow, ownerId: string | null): NftDetail {
   const s = toSummary(n, ownerId)
   return {
     ...s,
@@ -80,13 +81,13 @@ export const nftHandlers = [
       const ownerId = getOwnerId(request)
       const all = Object.values(db.state.nfts)
 
-      const matchesText = (n: NftRecord) => !p.q || n.name.toLowerCase().includes(p.q) || n.series.toLowerCase().includes(p.q)
-      const price = (n: NftRecord) => editionPrice(n.basePrice, '1/50')
-      const matchesPrice = (n: NftRecord) =>
+      const matchesText = (n: NftRow) => !p.q || n.name.toLowerCase().includes(p.q) || n.series.toLowerCase().includes(p.q)
+      const price = (n: NftRow) => editionPrice(n.basePrice, '1/50')
+      const matchesPrice = (n: NftRow) =>
         (!p.minPrice || compare(price(n), p.minPrice) >= 0) && (!p.maxPrice || compare(price(n), p.maxPrice) <= 0)
-      const matchesTab = (n: NftRecord) => (p.tab === 'new' ? n.isNew : p.tab === 'trending' ? n.trendingScore >= 60 : true)
-      const matchesCollection = (n: NftRecord) => !p.collections.length || p.collections.includes(n.collection)
-      const matchesNetwork = (n: NftRecord) => !p.networks.length || p.networks.includes(n.network)
+      const matchesTab = (n: NftRow) => (p.tab === 'new' ? n.isNew : p.tab === 'trending' ? n.trendingScore >= 60 : true)
+      const matchesCollection = (n: NftRow) => !p.collections.length || p.collections.includes(n.collection)
+      const matchesNetwork = (n: NftRow) => !p.networks.length || p.networks.includes(n.network)
 
       const base = all.filter((n) => matchesText(n) && matchesPrice(n) && matchesTab(n))
       // facetas: cada grupo conta ignorando o próprio filtro (padrão de e-commerce)

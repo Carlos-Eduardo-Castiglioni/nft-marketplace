@@ -48,14 +48,19 @@ test('jornada completa com mudança de preço em tempo real e recuperação idem
 
   // 5. Recuperação: reenviar com a mesma chave não duplica a compra
   await page.getByTestId('retry-order').click()
-  const success = page.getByRole('dialog', { name: 'Seus NFTs agora estão na sua carteira' })
-  await expect(success).toBeVisible()
+  await page.waitForURL(/\/orders\/ord-/)
+  // `order.updated` chega via socket e confirma a transação; só então o recibo aparece
+  await expect(page.getByTestId('order-status')).toHaveAttribute('data-status', 'confirmed')
+  const success = page.getByRole('article', { name: 'Seus NFTs agora estão na sua carteira' })
   await expect(success.getByTestId('order-total')).toHaveText('2.516 ETH')
-  // `order.updated` chega via socket e confirma a transação
-  await expect(success.getByTestId('order-status')).toHaveAttribute('data-status', 'confirmed')
   expect(await app.mock((lab) => lab.countOrders())).toBe(1)
 
-  await success.getByRole('button', { name: 'Ver minhas compras' }).click()
+  // o recibo é um snapshot: mudar o catálogo depois não altera os valores
+  await app.mock((lab) => lab.changePrice('emerald-ape-042', '9.99'))
+  await page.reload()
+  await expect(page.getByTestId('order-total')).toHaveText('2.516 ETH')
+
+  await page.getByRole('link', { name: 'Ver minhas compras' }).click()
   await page.waitForURL('**/profile/activity')
   await expect(page.getByTestId('order-item')).toHaveCount(1)
   await expect(page.getByTestId('order-item')).toContainText('Confirmado')
@@ -68,7 +73,8 @@ test('timeout simples é recuperado automaticamente com a mesma chave', async ({
   await app.goto('/checkout')
   await app.mock((lab) => lab.setScenario('orders.create', 'timeout-after-commit', { times: 1 }))
   await page.getByTestId('confirm-order').click()
-  await expect(page.getByRole('dialog', { name: 'Seus NFTs agora estão na sua carteira' })).toBeVisible({ timeout: 15_000 })
+  await page.waitForURL(/\/orders\/ord-/, { timeout: 15_000 })
+  await expect(page.getByTestId('order-status')).toHaveAttribute('data-status', 'confirmed')
   expect(await app.mock((lab) => lab.countOrders())).toBe(1)
 })
 
@@ -81,6 +87,6 @@ test('erro 500 no pedido mostra opção de tentar novamente', async ({ page, app
   await expect(page.getByTestId('retry-order')).toBeVisible()
   expect(await app.mock((lab) => lab.countOrders())).toBe(0)
   await page.getByTestId('retry-order').click()
-  await expect(page.getByRole('dialog', { name: 'Seus NFTs agora estão na sua carteira' })).toBeVisible()
+  await expect(page.getByTestId('order-status')).toHaveAttribute('data-status', 'confirmed')
   expect(await app.mock((lab) => lab.countOrders())).toBe(1)
 })

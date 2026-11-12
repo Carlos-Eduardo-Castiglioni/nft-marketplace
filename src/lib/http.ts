@@ -16,6 +16,13 @@ export const credentials = {
     if (t) s.setItem(TOKEN_KEY, t)
     else s.removeItem(TOKEN_KEY)
   },
+  /** Novo carrinho anônimo (após logout o próximo visitante começa do zero). */
+  rotateCartId: () => {
+    const id = `cart-${uuid()}`
+    memory[CART_KEY] = id
+    safeStorage()?.setItem(CART_KEY, id)
+    return id
+  },
   getCartId: () => {
     const s = safeStorage()
     let id = s?.getItem(CART_KEY) ?? memory[CART_KEY]
@@ -98,7 +105,25 @@ export function toApiError(error: unknown): ApiError {
   return new ApiError({ kind: 'unknown', message: error instanceof Error ? error.message : 'Erro desconhecido.' })
 }
 
+/**
+ * Sessão expirada: uma requisição AUTENTICADA que volta 401 derruba o token e
+ * avisa a aplicação (que limpa o cache privado e leva ao login com retorno).
+ */
+const expiredListeners = new Set<() => void>()
+export const onSessionExpired = (fn: () => void) => {
+  expiredListeners.add(fn)
+  return () => void expiredListeners.delete(fn)
+}
+
 http.interceptors.response.use(
   (r) => r,
-  (error) => Promise.reject(toApiError(error)),
+  (error) => {
+    const e = toApiError(error)
+    const sentToken = (error as AxiosError).config?.headers?.get('Authorization')
+    if (e.status === 401 && sentToken && sentToken === `Bearer ${credentials.getToken()}`) {
+      credentials.setToken(null)
+      for (const fn of expiredListeners) fn()
+    }
+    return Promise.reject(e)
+  },
 )

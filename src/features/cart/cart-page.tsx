@@ -13,7 +13,7 @@ import { useSession } from '@/features/auth/api'
 import { useAuthDialog } from '@/features/auth/auth-dialog'
 import { NftCarousel } from '@/features/catalog/nft-carousel'
 import { useCart, useRemoveLine, useUpdateQuantity } from './api'
-import { CouponForm, PriceChangeAlert, Totals } from './cart-summary'
+import { CouponForm, PriceChangeAlert, StockAlert, Totals } from './cart-summary'
 
 export function CartPage() {
   const query = useCart()
@@ -65,6 +65,7 @@ function CartContent({ cart }: { cart: Cart }) {
     <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
       <div>
         <PriceChangeAlert cart={cart} />
+        <StockAlert cart={cart} />
         {/* Desktop: tabela */}
         <table className="hidden w-full border-separate border-spacing-y-2 font-mono text-xs md:table">
           <caption className="sr-only">Itens do carrinho</caption>
@@ -132,6 +133,16 @@ function useLineActions(line: CartLine) {
   return { update, remove, max }
 }
 
+/** Disponibilidade atualizada em tempo real (`nft.updated` invalida o carrinho). */
+function StockNote({ line }: { line: CartLine }) {
+  if (line.quantity <= line.stock) return null
+  return (
+    <p className="text-[10px] font-semibold text-warning" data-testid="stock-note">
+      {line.stock === 0 ? 'Edição esgotada — remova o item para continuar.' : `Apenas ${line.stock} disponível(is) — ajuste a quantidade.`}
+    </p>
+  )
+}
+
 function PriceCell({ line }: { line: CartLine }) {
   return line.priceChanged ? (
     <span className="flex flex-col">
@@ -159,6 +170,7 @@ function CartRow({ line }: { line: CartLine }) {
             <p className="text-[10px] text-primary">
               ID do token: #{line.tokenId} · {line.editionLabel}
             </p>
+            <StockNote line={line} />
           </div>
         </div>
       </td>
@@ -189,6 +201,7 @@ function CartCard({ line }: { line: CartLine }) {
         <div className="min-w-0">
           <p className="truncate text-sm font-bold">{line.name}</p>
           <p className="text-xs text-muted">Edição: {line.editionLabel}</p>
+          <StockNote line={line} />
           <p className={cn('mt-2 text-base font-bold text-primary', line.priceChanged && 'text-warning')}>
             <Eth value={lineTotal(line)} />
           </p>

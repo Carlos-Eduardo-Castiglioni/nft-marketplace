@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-12T22:57:57.861Z",
+  "runsPerPageAndProfile": 3,
+  "aggregation": "mediana",
+  "target": "http://localhost:4174",
+  "build": "vite build (produção) servido por vite preview; mocks MSW no cenário padrão",
+  "tools": {
+    "lighthouse": "13.6.0",
+    "chrome-launcher": "1.2.3",
+    "playwright": "1.63.0",
+    "vite": "7.3.8",
+    "node": "v24.15.0",
+    "chrome": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36"
+  },
+  "machine": {
+    "os": "Windows_NT 10.0.26200",
+    "arch": "x64",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13450HX",
+    "cores": 16,
+    "memoryGB": 32
+  },
+  "profiles": {
+    "mobile": "padrão do Lighthouse: Moto G Power emulado, Slow 4G simulado (150 ms RTT, 1,6 Mbps), CPU 4x mais lenta",
+    "desktop": "1350×940, 40 ms RTT, 10 Mbps, sem desaceleração de CPU"
+  },
+  "targets": {
+    "performance": 90,
+    "accessibility": 95,
+    "best-practices": 95,
+    "seo": 90
+  },
+  "gate": {
+    "mobile": {
+      "performance": 50,
+      "accessibility": 95,
+      "best-practices": 95,
+      "seo": 90
+    },
+    "desktop": {
+      "performance": 90,
+      "accessibility": 95,
+      "best-practices": 95,
+      "seo": 90
+    }
+  }
+}

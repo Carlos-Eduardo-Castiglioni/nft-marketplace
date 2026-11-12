@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { NftListResponse } from '@/lib/api-types'
 import { Slider } from '@/components/ui/slider'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,11 +29,14 @@ export function CatalogFilters({ search, facets, onChange, idPrefix = 'f', class
   const urlRange: [number, number] = [search.minPrice ?? bounds[0], search.maxPrice ?? bounds[1]]
   const [range, setRange] = useState<[number, number]>(urlRange)
 
-  // URL é a fonte da verdade: sincroniza quando ela muda (voltar/avançar, limpar)
-  useEffect(() => {
-    setRange([search.minPrice ?? bounds[0], search.maxPrice ?? bounds[1]])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.minPrice, search.maxPrice, bounds[0], bounds[1]])
+  // URL é a fonte da verdade: ressincroniza durante o render quando ela muda
+  // (voltar/avançar, limpar) — sem efeito, sem render extra em cascata.
+  const urlKey = `${urlRange[0]}|${urlRange[1]}`
+  const [syncedKey, setSyncedKey] = useState(urlKey)
+  if (syncedKey !== urlKey) {
+    setSyncedKey(urlKey)
+    setRange(urlRange)
+  }
 
   const selectedCollections = toList(search.collections)
   const selectedNetworks = toList(search.networks)

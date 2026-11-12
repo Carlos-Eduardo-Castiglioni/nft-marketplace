@@ -7,7 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,9 +16,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
       - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
+      # fluxos funcionais (desktop + mobile)
+      - run: npx playwright test --grep-invert @visual
+      # regressão visual: as baselines são por plataforma (fontes/antialiasing).
+      # Roda quando existirem baselines Linux versionadas — ver README.
+      - name: Regressão visual
+        if: hashFiles('e2e/__screenshots__/linux/**/*.png') != ''
+        run: npm run e2e:visual
       - run: npm run lighthouse
         env:
           CHROME_PATH: /usr/bin/google-chrome
@@ -28,4 +35,5 @@ jobs:
           name: reports
           path: |
             playwright-report
+            test-results
             lighthouse-report

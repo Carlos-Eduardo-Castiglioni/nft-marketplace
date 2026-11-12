@@ -49,3 +49,33 @@ test('modo inline (sem Service Worker): REST e Socket.IO continuam simulados', a
   await expect(page.getByTestId('detail-price')).toHaveText(/0\.45 ETH/)
   expect(real).toEqual([])
 })
+
+const realtimeStats = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => ({ ...(window as unknown as { __kurioRealtime: { applied: number; ignored: number } }).__kurioRealtime }))
+
+test('eventos duplicados e antigos são descartados sem regredir o preço', async ({ page, app }) => {
+  await app.goto('/nft/cosmic-bloom-118')
+  await app.waitRealtime()
+  await app.mock((lab) => lab.changePrice('cosmic-bloom-118', '2.40'))
+  await expect(page.getByTestId('detail-price')).toHaveText(/2\.4 ETH|2\.40 ETH/)
+  const before = await realtimeStats(page)
+
+  // mesmo eventId reenviado: descartado
+  await app.mock((lab) => lab.replayLastEvent())
+  await expect.poll(async () => (await realtimeStats(page)).ignored).toBe(before.ignored + 1)
+
+  // versão antiga com outro preço: descartada, a UI não regride
+  await app.mock((lab) => lab.emitStaleNftEvent('cosmic-bloom-118', '0.01'))
+  await expect.poll(async () => (await realtimeStats(page)).ignored).toBe(before.ignored + 2)
+  await expect(page.getByTestId('detail-price')).toHaveText(/2\.4 ETH|2\.40 ETH/)
+  expect((await realtimeStats(page)).applied).toBe(before.applied)
+})
+
+test('carrinho aberto reflete mudança de disponibilidade via socket', async ({ page, app }) => {
+  await app.addToCart('last-light-777')
+  await app.waitRealtime()
+  await expect(page.getByTestId('cart-line')).toHaveCount(1)
+  await app.mock((lab) => lab.changeStock('last-light-777', '1/50', 0))
+  await expect(page.getByTestId('cart-line').getByTestId('stock-note')).toHaveText('Edição esgotada — remova o item para continuar.')
+  await expect(page.getByText('A disponibilidade mudou')).toBeVisible()
+})

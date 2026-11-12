@@ -111,6 +111,27 @@ export function Totals({ cart }: { cart: Cart }) {
  * Alerta exibido quando o preço de algum item mudou (evento `nft.updated`).
  * Bloqueia a finalização até o usuário aceitar o novo valor.
  */
+export const hasStockIssues = (cart: Cart) => cart.lines.some((l) => l.quantity > l.stock)
+
+/** Alerta anunciado (role=alert) quando a disponibilidade muda com o carrinho aberto. */
+export function StockAlert({ cart }: { cart: Cart }) {
+  if (!hasStockIssues(cart)) return null
+  return (
+    <Alert variant="warning" title="A disponibilidade mudou" className="mb-4">
+      <ul className="space-y-1 font-mono text-xs">
+        {cart.lines
+          .filter((l) => l.quantity > l.stock)
+          .map((l) => (
+            <li key={l.id}>
+              {l.name} ({l.editionLabel}): {l.stock === 0 ? 'esgotado' : `restam ${l.stock}`}
+            </li>
+          ))}
+      </ul>
+      <p className="mt-2 text-xs">Ajuste as quantidades para continuar.</p>
+    </Alert>
+  )
+}
+
 export function PriceChangeAlert({ cart }: { cart: Cart }) {
   const accept = useAcceptPrices()
   if (!cart.hasPriceChanges) return null

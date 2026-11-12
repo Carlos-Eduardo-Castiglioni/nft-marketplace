@@ -53,25 +53,24 @@ function NftDetailView({ nft }: { nft: NftDetail }) {
 
   const defaultEdition = nft.editions.find((e) => e.id === '1/50' && e.stock > 0) ?? nft.editions.find((e) => e.stock > 0) ?? nft.editions[0]
   const [editionId, setEditionId] = useState<EditionId>(defaultEdition.id)
-  const [qty, setQty] = useState(1)
+  const [rawQty, setQty] = useState(1)
   const [activeImage, setActiveImage] = useState(0)
   const edition = nft.editions.find((e) => e.id === editionId)!
 
   const inCart = cart?.lines.find((l) => l.nftId === nft.id && l.editionId === editionId)?.quantity ?? 0
   const limit = Math.max(0, Math.min(edition.stock, edition.maxPerOrder) - inCart)
   const soldOut = edition.stock === 0
-  useEffect(() => {
-    setQty((q) => Math.max(1, Math.min(q, limit || 1)))
-  }, [limit])
+  // quantidade sempre dentro do limite vigente (o estoque pode mudar em tempo real)
+  const qty = Math.max(1, Math.min(rawQty, limit || 1))
 
-  const [flash, setFlash] = useState(false)
+  // destaque de 2,5 s quando chega `nft.updated` deste NFT
+  const [expiredEvent, setExpiredEvent] = useState<typeof lastNftEvent>(null)
+  const flash = lastNftEvent?.id === nft.id && lastNftEvent !== expiredEvent
   useEffect(() => {
-    if (lastNftEvent?.id === nft.id) {
-      setFlash(true)
-      const t = setTimeout(() => setFlash(false), 2500)
-      return () => clearTimeout(t)
-    }
-  }, [lastNftEvent, nft.id])
+    if (!flash) return
+    const t = setTimeout(() => setExpiredEvent(lastNftEvent), 2500)
+    return () => clearTimeout(t)
+  }, [flash, lastNftEvent])
 
   const limitMessage = useMemo(() => {
     if (soldOut) return 'Edição esgotada.'

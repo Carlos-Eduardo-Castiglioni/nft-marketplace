@@ -1,7 +1,7 @@
 import { delay, HttpResponse, type DefaultBodyType, type HttpResponseResolver, type PathParams } from 'msw'
 import type { ApiErrorBody } from '@/lib/api-types'
 import { db, type UserRecord } from './db'
-import { consumeScenario, mockConfig, type RouteKey } from './scenarios'
+import { consumeScenario, nextLatency, type RouteKey } from './scenarios'
 
 export function apiError(status: number, code: string, message: string, details?: unknown) {
   return HttpResponse.json<ApiErrorBody>({ code, message, details }, { status })
@@ -38,7 +38,7 @@ export function withScenario<Params extends PathParams = PathParams, Body extend
 ): Resolver<Params, Body> {
   return async (info) => {
     const scenario = consumeScenario(route)
-    await delay(scenario === 'slow' ? mockConfig.slowLatency : mockConfig.latency)
+    await delay(nextLatency(scenario))
     switch (scenario) {
       case 'server-error':
         return apiError(500, 'INTERNAL', 'Erro interno simulado. Tente novamente.')

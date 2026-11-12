@@ -44,6 +44,7 @@ export type RouteKey =
   | 'cart.mutate'
   | 'orders.create'
   | 'orders.list'
+  | 'orders.get'
   | 'profile'
   | 'wallets'
 
@@ -59,6 +60,7 @@ export const ROUTE_KEYS: RouteKey[] = [
   'cart.mutate',
   'orders.create',
   'orders.list',
+  'orders.get',
   'profile',
   'wallets',
 ]
@@ -71,10 +73,30 @@ interface ActiveScenario {
 
 const active = new Map<RouteKey, ActiveScenario>()
 
+export type PaymentOutcome = 'confirm' | 'decline' | 'manual'
+export const PAYMENT_OUTCOMES: PaymentOutcome[] = ['confirm', 'decline', 'manual']
+
 export const mockConfig = {
   /** latência base de toda resposta (ms) — determinística, sem jitter */
   latency: 250,
   slowLatency: 2500,
+  /**
+   * Latência variável: cada resposta recebe `latency + jitter[i % n]` ms.
+   * A sequência é fixa (reprodutível) e produz respostas fora de ordem.
+   */
+  jitter: [] as number[],
+  /** resultado do pagamento na liquidação simulada */
+  payment: 'confirm' as PaymentOutcome,
+  /** tempo até a "rede" liquidar o pedido (ms) */
+  settleDelay: 1200,
+}
+
+let jitterIndex = 0
+/** Próxima latência da sequência determinística. */
+export function nextLatency(kind: ScenarioKind) {
+  if (kind === 'slow') return mockConfig.slowLatency
+  const j = mockConfig.jitter
+  return mockConfig.latency + (j.length ? j[jitterIndex++ % j.length] : 0)
 }
 
 export function setScenario(route: RouteKey, kind: ScenarioKind, opts: { times?: number } = {}) {
@@ -104,6 +126,12 @@ export function initScenariosFromEnvironment() {
     const latency = localStorage.getItem('kurio:mock-latency')
     if (latency !== null && !Number.isNaN(Number(latency))) mockConfig.latency = Number(latency)
     const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment') ?? localStorage.getItem('kurio:mock-payment')
+    if (PAYMENT_OUTCOMES.includes(payment as PaymentOutcome)) mockConfig.payment = payment as PaymentOutcome
+    const settle = localStorage.getItem('kurio:mock-settle-delay')
+    if (settle !== null && !Number.isNaN(Number(settle))) mockConfig.settleDelay = Number(settle)
+    const jitter = params.get('jitter') ?? localStorage.getItem('kurio:mock-jitter')
+    if (jitter) mockConfig.jitter = jitter.split(',').map(Number).filter((n) => Number.isFinite(n) && n >= 0)
     for (const entry of params.getAll('mock')) {
       const [route, kind, times] = entry.split(':')
       if (ROUTE_KEYS.includes(route as RouteKey) && SCENARIO_KINDS.includes(kind as ScenarioKind)) {

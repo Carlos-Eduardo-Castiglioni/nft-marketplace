@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -45,7 +45,7 @@ export function ProfileForm() {
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
-      })
+      }, { keepDirtyValues: true })
   }, [profile, form])
 
   if (isPending) return <Skeleton className="h-[32rem] w-full" />
@@ -92,20 +92,7 @@ export function ProfileForm() {
         <Field label="Apelido da carteira" required error={errors.walletNickname?.message}>
           <Input className="h-9" {...form.register('walletNickname')} />
         </Field>
-        <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-xs font-medium">Avatar</span>
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-full bg-surface-3 text-primary" aria-hidden>
-              <ImageIcon className="size-4" />
-            </span>
-            <Button type="button" size="sm" onClick={() => toast.info('Upload de avatar simulado.')}>
-              Alterar
-            </Button>
-            <Button type="button" size="sm" variant="ghost">
-              Remover
-            </Button>
-          </div>
-        </div>
+        <AvatarField avatarUrl={profile?.avatarUrl} name={profile?.displayName ?? ''} />
       </div>
 
       <fieldset className="mt-8 max-w-sm space-y-4">
@@ -124,5 +111,99 @@ export function ProfileForm() {
         Salvar
       </Button>
     </form>
+  )
+}
+
+const AVATAR_SIZE = 128
+const MAX_SOURCE_BYTES = 5 * 1024 * 1024
+
+/** Lê a imagem escolhida e a reduz para 128×128 (recorte central) em JPEG. */
+async function toAvatarDataUrl(file: File): Promise<string> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    const side = Math.min(img.naturalWidth, img.naturalHeight)
+    const canvas = document.createElement('canvas')
+    canvas.width = AVATAR_SIZE
+    canvas.height = AVATAR_SIZE
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('canvas')
+    ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
+    return canvas.toDataURL('image/jpeg', 0.85)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/** Avatar: upload real para a API simulada (persistido no perfil) e remoção. */
+function AvatarField({ avatarUrl, name }: { avatarUrl?: string; name: string }) {
+  const update = useUpdateProfile()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState<string | null>(null)
+  const errorId = useId()
+  const inputId = useId()
+
+  const save = (value: string | null, success: string) => {
+    setError(null)
+    update.mutate(
+      { avatarUrl: value },
+      {
+        onSuccess: () => toast.success(success),
+        onError: (e) => setError(e.message),
+      },
+    )
+  }
+
+  const onFile = async (file: File | undefined) => {
+    if (inputRef.current) inputRef.current.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) return setError('Selecione um arquivo de imagem (PNG, JPEG, WebP ou GIF).')
+    if (file.size > MAX_SOURCE_BYTES) return setError('A imagem deve ter no máximo 5 MB.')
+    try {
+      save(await toAvatarDataUrl(file), 'Avatar atualizado!')
+    } catch {
+      setError('Não foi possível ler esta imagem.')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5" role="group" aria-labelledby={`${inputId}-label`}>
+      <span id={`${inputId}-label`} className="font-mono text-xs font-medium">
+        Avatar
+      </span>
+      <div className="flex items-center gap-3">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={`Avatar de ${name}`} width={36} height={36} className="size-9 rounded-full object-cover" data-testid="avatar-image" />
+        ) : (
+          <span className="flex size-9 items-center justify-center rounded-full bg-surface-3 text-primary" aria-hidden>
+            <ImageIcon className="size-4" />
+          </span>
+        )}
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="sr-only"
+          tabIndex={-1}
+          aria-label="Arquivo do avatar"
+          aria-describedby={error ? errorId : undefined}
+          onChange={(e) => void onFile(e.target.files?.[0])}
+        />
+        <Button type="button" size="sm" loading={update.isPending} onClick={() => inputRef.current?.click()}>
+          Alterar
+        </Button>
+        <Button type="button" size="sm" variant="ghost" disabled={!avatarUrl || update.isPending} onClick={() => save(null, 'Avatar removido.')}>
+          Remover
+        </Button>
+      </div>
+      {error && (
+        <p id={errorId} role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }

@@ -17,8 +17,8 @@ interface Attempt {
   createdAt: number
 }
 
-export function intentOf(input: { cartVersion: number; walletId: string; provider: string }) {
-  return `${input.cartVersion}|${input.walletId}|${input.provider}`
+export function intentOf(input: { cartVersion: number; walletId: string; provider: string; total?: string }) {
+  return `${input.cartVersion}|${input.walletId}|${input.provider}|${input.total ?? ''}`
 }
 
 function read(): Attempt | null {

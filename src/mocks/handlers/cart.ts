@@ -3,10 +3,13 @@ import type { Cart, CartLine, EditionId, Order, WalletProvider } from '@/lib/api
 import { COUPONS, computeTotals } from '@/lib/cart-math'
 import { eq } from '@/lib/eth'
 import { uuid } from '@/lib/utils'
-import { db, persist, type CartRecord } from '../db'
+import { db, persist, type CartRecord, type OrderRecord } from '../db'
 import { ART, EDITIONS, editionPrice } from '../fixtures/nfts'
-import { apiError, getCartId, requireUser, withScenario } from '../http'
-import { broadcast } from '../realtime'
+import { apiError, getCartId, getUser, requireUser, withScenario } from '../http'
+import { planSettlement, resumePendingSettlements, scheduleSettlement } from '../orders'
+
+// pedidos pendentes de uma sessão anterior (refresh) voltam a ser liquidados
+resumePendingSettlements()
 
 function getCart(id: string): CartRecord {
   db.state.carts[id] ??= { id, version: 1, lines: [] }
@@ -48,16 +51,47 @@ export function serializeCart(c: CartRecord): Cart {
   }
 }
 
+/** Cupons que existiram mas expiraram (cenário determinístico de "cupom expirado"). */
+const EXPIRED_COUPONS = ['BLACK2025']
+
 function touch(c: CartRecord) {
   c.version += 1
   persist()
   return HttpResponse.json(serializeCart(c))
 }
 
+/**
+ * Chave do carrinho: autenticado => carrinho do usuário (`user:<id>`);
+ * visitante => carrinho anônimo do navegador (`X-Cart-Id`).
+ * Assim, dados de um usuário nunca aparecem para o próximo que usar o navegador.
+ */
 function requireCartId(request: Request) {
+  const user = getUser(request)
+  if (user) return `user:${user.id}`
   const id = getCartId(request)
   if (!id) throw apiError(400, 'NO_CART', 'Cabeçalho X-Cart-Id ausente.')
   return id
+}
+
+/** Ao autenticar, os itens do visitante são preservados: mesclados no carrinho do usuário. */
+export function mergeVisitorCart(visitorCartId: string | null, userId: string) {
+  if (!visitorCartId) return
+  const visitor = db.state.carts[visitorCartId]
+  if (!visitor) return
+  const target = getCart(`user:${userId}`)
+  for (const l of visitor.lines) {
+    const n = db.state.nfts[l.nftId]
+    const edition = EDITIONS.find((e) => e.id === l.editionId)
+    if (!n || !edition) continue
+    const limit = Math.max(1, Math.min(n.stock[l.editionId], edition.maxPerOrder))
+    const existing = target.lines.find((t) => t.nftId === l.nftId && t.editionId === l.editionId)
+    if (existing) existing.quantity = Math.min(limit, existing.quantity + l.quantity)
+    else target.lines.push({ ...l, quantity: Math.min(limit, l.quantity) })
+  }
+  target.couponCode ??= visitor.couponCode
+  if (visitor.lines.length) target.version += 1
+  delete db.state.carts[visitorCartId]
+  persist()
 }
 
 function validateQuantity(nftId: string, editionId: EditionId, quantity: number) {
@@ -127,6 +161,9 @@ export const cartHandlers = [
       const cart = getCart(requireCartId(request))
       const { code } = (await request.json()) as { code: string }
       const normalized = (code ?? '').trim().toUpperCase()
+      if (EXPIRED_COUPONS.includes(normalized)) {
+        return apiError(422, 'COUPON_EXPIRED', 'Este código promocional expirou.', { field: 'code' })
+      }
       if (!COUPONS[normalized]) return apiError(422, 'INVALID_COUPON', 'Código promocional inválido ou expirado.', { field: 'code' })
       cart.couponCode = normalized
       return touch(cart)
@@ -167,12 +204,19 @@ function fakeTxHash(seed: string) {
   return `0x${out.slice(0, 64)}`
 }
 
+function toPublicOrder(o: OrderRecord): Order {
+  const { ownerId: _o, cartId: _c, settleAt: _s, outcome: _out, ...order } = o
+  return order
+}
+
 export const orderHandlers = [
   /**
-   * Cria um pedido de forma idempotente.
-   * - Mesmo `Idempotency-Key` + mesmo carrinho => devolve o pedido já criado (200).
-   * - Mesmo `Idempotency-Key` + payload diferente => 422.
-   * - Preço mudou desde que foi travado => 409 PRICE_CHANGED (cliente precisa aceitar).
+   * Cria um pedido de forma idempotente (status inicial `pending`).
+   * - Mesmo `Idempotency-Key` + mesmo conteúdo => devolve o pedido já criado (200).
+   * - Mesmo `Idempotency-Key` + conteúdo diferente => 409 IDEMPOTENCY_CONFLICT.
+   * - Já existe pedido pendente deste carrinho => 409 ORDER_PENDING (não duplica a compra).
+   * - Preço/estoque/cupom mudou desde a cotação => 409 (cliente precisa revisar e reconfirmar).
+   * O carrinho só é alterado quando o pedido é CONFIRMADO (ver mocks/orders.ts).
    */
   http.post(
     '*/api/orders',
@@ -180,17 +224,22 @@ export const orderHandlers = [
       const user = requireUser(request)
       const key = request.headers.get('idempotency-key')
       if (!key) return apiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Cabeçalho Idempotency-Key é obrigatório.')
-      const body = (await request.json()) as { cartVersion: number; walletId: string; provider: WalletProvider }
+      const body = (await request.json()) as { cartVersion: number; walletId: string; provider: WalletProvider; total?: string }
       const cartId = requireCartId(request)
-      const fingerprint = `${user.id}:${cartId}:${body.cartVersion}:${body.walletId}:${body.provider}`
+      const fingerprint = `${user.id}:${cartId}:${body.cartVersion}:${body.walletId}:${body.provider}:${body.total ?? ''}`
 
       const previous = db.state.idempotency[key]
       if (previous) {
         if (previous.fingerprint !== fingerprint) {
-          return apiError(422, 'IDEMPOTENCY_MISMATCH', 'Chave de idempotência reutilizada com outro payload.')
+          return apiError(409, 'IDEMPOTENCY_CONFLICT', 'Chave de idempotência reutilizada com outro conteúdo.')
         }
         const order = db.state.orders[previous.orderId]
-        return HttpResponse.json(order, { status: 200, headers: { 'Idempotent-Replayed': 'true' } })
+        return HttpResponse.json(toPublicOrder(order), { status: 200, headers: { 'Idempotent-Replayed': 'true' } })
+      }
+
+      const pending = Object.values(db.state.orders).find((o) => o.ownerId === user.id && o.cartId === cartId && o.status === 'pending')
+      if (pending) {
+        return apiError(409, 'ORDER_PENDING', 'Já existe um pedido aguardando confirmação para este carrinho.', { orderId: pending.id })
       }
 
       const cart = getCart(cartId)
@@ -209,25 +258,32 @@ export const orderHandlers = [
           return apiError(409, 'OUT_OF_STOCK', `Estoque insuficiente para ${l.name}.`, { lineId: l.id })
         }
       }
+      if (body.total !== undefined && body.total !== serialized.total) {
+        return apiError(409, 'QUOTE_CHANGED', 'O total mudou desde a revisão. Confirme novamente.', { total: serialized.total })
+      }
       const wallet = (db.state.wallets[user.id] ?? []).find((w) => w.id === body.walletId)
       if (!wallet) return apiError(422, 'WALLET_REQUIRED', 'Selecione uma carteira válida.', { field: 'walletId' })
 
       const id = `ord-${uuid().slice(0, 8)}`
-      const order: Order & { ownerId: string } = {
+      const order: OrderRecord = {
         id,
         ownerId: user.id,
+        cartId,
         txHash: fakeTxHash(id),
         status: 'pending',
+        version: 1,
         createdAt: new Date().toISOString(),
-        lines: serialized.lines.map(({ nftId, name, tokenId, thumb, editionLabel, quantity, unitPrice }) => ({
+        lines: serialized.lines.map(({ nftId, name, tokenId, thumb, editionId, editionLabel, quantity, unitPrice }) => ({
           nftId,
           name,
           tokenId,
           thumb,
+          editionId,
           editionLabel,
           quantity,
           unitPrice,
         })),
+        coupon: serialized.coupon,
         subtotal: serialized.subtotal,
         discount: serialized.discount,
         networkFee: serialized.networkFee,
@@ -236,25 +292,14 @@ export const orderHandlers = [
         provider: body.provider,
         idempotencyKey: key,
       }
-      // baixa de estoque + limpeza do carrinho
-      for (const l of cart.lines) db.state.nfts[l.nftId].stock[l.editionId] -= l.quantity
-      cart.lines = []
-      cart.couponCode = undefined
-      cart.version += 1
+      planSettlement(order)
       db.state.orders[id] = order
       db.state.idempotency[key] = { orderId: id, fingerprint }
       persist()
+      // confirmação "on-chain" assíncrona, notificada via Socket.IO (`order.updated`)
+      scheduleSettlement(order)
 
-      // confirmação "on-chain" assíncrona, notificada via Socket.IO
-      setTimeout(() => {
-        const o = db.state.orders[id]
-        if (!o) return
-        o.status = 'confirmed'
-        persist()
-        broadcast('order.updated', { id, status: 'confirmed', at: new Date().toISOString() })
-      }, 1200)
-
-      return HttpResponse.json(order, { status: 201 })
+      return HttpResponse.json(toPublicOrder(order), { status: 201 })
     }),
   ),
 
@@ -265,17 +310,19 @@ export const orderHandlers = [
       const orders = Object.values(db.state.orders)
         .filter((o) => o.ownerId === user.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(toPublicOrder)
       return HttpResponse.json(orders)
     }),
   ),
 
   http.get(
     '*/api/orders/:id',
-    withScenario('orders.list', ({ request, params }) => {
+    withScenario('orders.get', ({ request, params }) => {
       const user = requireUser(request)
       const o = db.state.orders[params.id as string]
-      if (!o || o.ownerId !== user.id) return apiError(404, 'ORDER_NOT_FOUND', 'Pedido não encontrado.')
-      return HttpResponse.json(o)
+      if (!o) return apiError(404, 'ORDER_NOT_FOUND', 'Pedido não encontrado.')
+      if (o.ownerId !== user.id) return apiError(403, 'FORBIDDEN', 'Este pedido pertence a outra conta.')
+      return HttpResponse.json(toPublicOrder(o))
     }),
   ),
 ]

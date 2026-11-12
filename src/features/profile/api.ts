@@ -19,7 +19,12 @@ export const walletsQuery = queryOptions({
 export const useProfile = () => useQuery(profileQuery)
 export const useWallets = () => useQuery(walletsQuery)
 
-export type ProfileUpdate = Partial<Omit<User, 'id'>> & { currentPassword?: string; newPassword?: string }
+export type ProfileUpdate = Partial<Omit<User, 'id' | 'avatarUrl'>> & {
+  /** data URL da imagem; `null` remove o avatar */
+  avatarUrl?: string | null
+  currentPassword?: string
+  newPassword?: string
+}
 
 export function useUpdateProfile() {
   const qc = useQueryClient()

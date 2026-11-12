@@ -32,9 +32,14 @@ export function ActivityPage() {
             <li key={o.id} className="rounded-xl bg-surface p-4 text-xs" data-testid="order-item">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold">
-                  Pedido {o.id} <span className="font-normal text-muted">· {formatDate(o.createdAt)}</span>
+                  <Link to="/orders/$orderId" params={{ orderId: o.id }} className="hover:text-primary hover:underline">
+                    Pedido {o.id}
+                  </Link>{' '}
+                  <span className="font-normal text-muted">· {formatDate(o.createdAt)}</span>
                 </p>
-                <Badge variant={o.status === 'confirmed' ? 'success' : 'warning'}>{o.status === 'confirmed' ? 'Confirmado' : 'Pendente'}</Badge>
+                <Badge variant={o.status === 'confirmed' ? 'success' : o.status === 'failed' ? 'muted' : 'warning'}>
+                  {o.status === 'confirmed' ? 'Confirmado' : o.status === 'failed' ? 'Recusado' : 'Pendente'}
+                </Badge>
               </div>
               <p className="mt-1 text-muted">
                 {o.lines.map((l) => `${l.name} (x${l.quantity})`).join(', ')}

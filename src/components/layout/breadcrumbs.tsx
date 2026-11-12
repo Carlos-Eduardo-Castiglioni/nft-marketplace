@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Fragment } from 'react'
 
-export function Breadcrumbs({ items }: { items: { label: string; to?: '/' | '/market' | '/cart' }[] }) {
+export function Breadcrumbs({ items }: { items: { label: string; to?: '/' | '/market' | '/cart' | '/profile/activity' }[] }) {
   return (
     <nav aria-label="Trilha de navegação" className="mb-4 font-mono text-[11px] font-semibold">
       <ol className="flex flex-wrap items-center gap-1.5">
